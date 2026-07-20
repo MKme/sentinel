@@ -93,15 +93,15 @@ Do not charge loose lithium cells with improvised wiring. Use protected cells, a
 
 ## Documentation
 
-- [Wiki home](wiki/Home.md)
-- [Parts and kits](wiki/Parts-and-Kits.md)
-- [Build the first node](wiki/Build-the-First-Node.md)
-- [Wiring reference](wiki/Wiring-Reference.md)
-- [XTOC and XCOM integration](wiki/XTOC-XCOM-Integration.md)
-- [Deployment and troubleshooting](wiki/Deployment-and-Troubleshooting.md)
-- [Packet and firmware notes](wiki/Packet-and-Firmware.md)
+- [Wiki home](https://github.com/MKme/sentinel/wiki)
+- [Parts and kits](https://github.com/MKme/sentinel/wiki/Parts-and-Kits)
+- [Build the first node](https://github.com/MKme/sentinel/wiki/Build-the-First-Node)
+- [Wiring reference](https://github.com/MKme/sentinel/wiki/Wiring-Reference)
+- [XTOC and XCOM integration](https://github.com/MKme/sentinel/wiki/XTOC-XCOM-Integration)
+- [Deployment and troubleshooting](https://github.com/MKme/sentinel/wiki/Deployment-and-Troubleshooting)
+- [Packet and firmware notes](https://github.com/MKme/sentinel/wiki/Packet-and-Firmware)
 
-GitHub does not publish a repository `wiki/` directory automatically. These pages are source-controlled and ready to copy into the repository's GitHub Wiki when that feature is enabled.
+The rendered GitHub Wiki is published from the source-controlled pages in `wiki/`.
 
 ## Safe deployment checklist
 
