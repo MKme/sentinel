@@ -115,10 +115,12 @@ The rendered GitHub Wiki is published from the source-controlled pages in `wiki/
 
 ## X Suite
 
-Sentinel reports are decoded by XTOC and XCOM. XTOC provides the Sentinel review page, Tactical Map layer, time-based triggers, label filters, temperature/battery thresholds, input/output-mask triggers, and `T=16 CONTROL` composition.
+Sentinel reports are decoded by XTOC and XCOM. XTOC provides the Sentinel review page, Tactical Map layer, time-based triggers, label filters, temperature/battery thresholds, input/output-mask triggers, and `T=16 CONTROL` composition. XINTEL supplies local radio/SDR monitoring and packet ingest, while XCORE provides local AI-assisted analysis of XTOC/XCOM operational data.
 
 - [XTOC](https://github.com/MKme/XTOC)
 - [XCOM](https://github.com/MKme/xcom)
+- [XINTEL](https://github.com/MKme/xintel) provides local radio/SDR monitoring, transcription, and packet ingest
+- [XCORE](https://github.com/MKme/xcore) provides local AI-assisted summaries and operational analysis
 - [XCAM](https://github.com/MKme/xcam) can also post camera-motion Sentinel reports
 - [XNODE](https://github.com/MKme/xnode) provides wearable and keyboard field endpoints
 
