@@ -7,6 +7,8 @@
 #include "SentinelPresenceConfig.h"
 #include "SentinelCore.h"
 #include "SentinelMavlink.h"
+#include "SentinelPosition.h"
+#include "RTC.h"
 #include "Channels.h"
 #include "MeshService.h"
 #include "NodeDB.h"
@@ -84,12 +86,22 @@ void loadSettings()
     Preferences p;
     if (!p.begin("sentinel", true)) return;
     SentinelSettings saved = {};
-    if (p.getBytesLength("config4") == sizeof(saved) &&
-        p.getBytes("config4", &saved, sizeof(saved)) == sizeof(saved) && validSettings(saved))
+    if (p.getBytesLength("config5") == sizeof(saved) &&
+        p.getBytes("config5", &saved, sizeof(saved)) == sizeof(saved) && validSettings(saved))
         settings = saved;
-    else if (p.getBytesLength("config4")==0 && p.getBytesLength("config3")==sizeof(SentinelSettingsV3)) {
-        SentinelSettings migrated{};
-        if(p.getBytes("config3",static_cast<SentinelSettingsV3*>(&migrated),sizeof(SentinelSettingsV3))==sizeof(SentinelSettingsV3) && validSettings(migrated)) settings=migrated;
+    else if (p.getBytesLength("config5")==0 && p.getBytesLength("config4")==sizeof(SentinelSettingsV4)) {
+        SentinelSettingsV4 legacy{};SentinelSettings migrated{};
+        if(p.getBytes("config4",&legacy,sizeof(legacy))==sizeof(legacy)) {
+            static_cast<SentinelSettingsV4&>(migrated)=legacy;
+            if(validSettings(migrated)) settings=migrated;
+        }
+    }
+    else if (p.getBytesLength("config5")==0 && p.getBytesLength("config4")==0 && p.getBytesLength("config3")==sizeof(SentinelSettingsV3)) {
+        SentinelSettingsV3 legacy{};SentinelSettings migrated{};
+        if(p.getBytes("config3",&legacy,sizeof(legacy))==sizeof(legacy)) {
+            static_cast<SentinelSettingsV3&>(migrated)=legacy;
+            if(validSettings(migrated)) settings=migrated;
+        }
     }
     p.end();
 }
@@ -99,9 +111,9 @@ bool saveSettings()
     if (!validSettings(settings)) return false;
     Preferences p;
     if (!p.begin("sentinel", false)) return false;
-    bool ok = p.putBytes("config4", &settings, sizeof(settings)) == sizeof(settings);
+    bool ok = p.putBytes("config5", &settings, sizeof(settings)) == sizeof(settings);
     SentinelSettings check = {};
-    ok = ok && p.getBytes("config4", &check, sizeof(check)) == sizeof(check) &&
+    ok = ok && p.getBytes("config5", &check, sizeof(check)) == sizeof(check) &&
          memcmp(&check, &settings, sizeof(check)) == 0;
     p.end();
     Serial.printf("[SENTINEL] settings_saved=%s\n", ok ? "true" : "false");
@@ -209,6 +221,7 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
             return 5;
         }
         pollMavlink(now);
+        pollSentinelPosition(now);
         pollMotion(now);
         processWifiEvents(now);
         hopWifiChannel(now);
@@ -242,24 +255,49 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
     unsigned mavNext=0, mavRead=0, mavWrite=0, mavOffset=0;
     uint32_t mavLastSend=0, mavSubmitted=0, mavSerialFrames=0, mavDropped=0;
 
-    bool mavChannelAllowed(bool sending) {
-        if(settings.mavChannel>=channels.getNumChannels()) return false;
-        const auto &ch=channels.getByIndex(settings.mavChannel);
+    sentinelPosition::Position mavPosition;
+    sentinelMav::Recent positionRecent;
+    void capturePosition(const sentinelMav::Frame &f,uint32_t owner,uint32_t now) {
+        if(positionRecent.contains(f,now)) return;
+        positionRecent.add(f,now);
+        mavPosition.observe(f,owner,settings.sentinelSystem,settings.sentinelComponent,now,getValidTime(RTCQualityDevice));
+    }
+    uint32_t lastPositionSent=0, positionSubmitted=0;
+    bool privateChannelAllowed(uint8_t index,bool sending) {
+        if(index>=channels.getNumChannels()) return false;
+        const auto &ch=channels.getByIndex(index);
         const auto &key=ch.role==meshtastic_Channel_Role_SECONDARY && ch.settings.psk.size==0
             ? channels.getByIndex(channels.getPrimaryIndex()) : ch;
         return channelAllowed(ch.has_settings && key.has_settings && ch.role!=meshtastic_Channel_Role_DISABLED && key.role!=meshtastic_Channel_Role_DISABLED,
             config.lora.region!=meshtastic_Config_LoRaConfig_RegionCode_UNSET, !sending || config.lora.tx_enabled,
             false,key.settings.psk.bytes,key.settings.psk.size);
     }
+    bool mavChannelAllowed(bool sending) {return privateChannelAllowed(settings.mavChannel,sending);}
+    void pollSentinelPosition(uint32_t now) {
+        if(!settings.sentinelSource || !mavPosition.fresh(now) ||
+            (lastPositionSent && uint32_t(now-lastPositionSent)<uint32_t(settings.sentinelIntervalSeconds)*1000) ||
+            !privateChannelAllowed(settings.meshChannelIndex,true)) return;
+        auto *p=allocDataPacket();if(!p)return;
+        char text[120];
+        const size_t length=sentinelPosition::wrapper(mavPosition,settings.label,p->id,text,sizeof(text));
+        // The bounded encoder always fits a valid Position and the configured 24-byte label.
+        p->decoded.portnum=meshtastic_PortNum_TEXT_MESSAGE_APP;p->channel=settings.meshChannelIndex;p->want_ack=false;
+        p->decoded.payload.size=length;memcpy(p->decoded.payload.bytes,text,length);
+        service->sendToMesh(p,RX_SRC_LOCAL,true);lastPositionSent=now;++positionSubmitted;
+        Serial.printf("[SENTINEL] position_submitted node=%08lX packet=%s\n",(unsigned long)mavPosition.owner,text);
+    }
     bool wantPacket(const meshtastic_MeshPacket *p) override {
         return p->decoded.portnum==meshtastic_PortNum_PRIVATE_APP;
     }
     ProcessMessage handleReceived(const meshtastic_MeshPacket &p) override {
-        if(!mavStarted || !settings.mavMeshToSerial || p.channel!=settings.mavChannel ||
+        if(!initialized || portalActive || p.channel!=settings.mavChannel ||
             p.from==nodeDB->getNodeNum() || !mavChannelAllowed(false)) return ProcessMessage::CONTINUE;
         sentinelMav::Frame f;
         if(!sentinelMav::decode(p.decoded.payload.bytes,p.decoded.payload.size,f)) {++mavDropped;return ProcessMessage::CONTINUE;}
         if(mavRecent.contains(f,millis())) return ProcessMessage::CONTINUE;
+        if(settings.sentinelSource==2 && p.from==settings.sentinelPeer)
+            capturePosition(f,p.from,millis());
+        if(!mavStarted || !settings.mavMeshToSerial) return ProcessMessage::CONTINUE;
         unsigned next=(mavWrite+1)%8;
         if(next==mavRead) {++mavDropped;return ProcessMessage::CONTINUE;}
         mavTx[mavWrite]=f;mavWrite=next;mavRecent.add(f,millis());
@@ -267,7 +305,7 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
     }
     void pollMavlink(uint32_t now) {
         if(!mavStarted) {
-            if(!settings.mavSerialToMesh && !settings.mavMeshToSerial) return;
+            if(!settings.mavSerialToMesh && !settings.mavMeshToSerial && settings.sentinelSource!=1) return;
             mavUart.setRxBufferSize(2048);
             mavUart.begin(settings.mavBaud,SERIAL_8N1,44,43);
             mavStarted=true;
@@ -277,7 +315,10 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
         for(unsigned budget=0;budget<1024 && mavUart.available();++budget) {
             uint8_t b=mavUart.read();
             sentinelMav::Frame f;
-            if(mavParser.feed(b,now,f) && settings.mavSerialToMesh && !mavRecent.contains(f,now)) {
+            if(mavParser.feed(b,now,f) && !mavRecent.contains(f,now)) {
+                if(settings.sentinelSource==1)
+                    capturePosition(f,nodeDB->getNodeNum(),now);
+                if(!settings.mavSerialToMesh) continue;
                 int type=sentinelMav::validate(f.data,f.size);
                 if(mavPending[type].size) ++mavDropped;
                 mavPending[type]=f;mavPendingAt[type]=now;
@@ -393,7 +434,17 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
             page += "<option value='"+String(baud)+"'"+(baud==settings.mavBaud?" selected":"")+">"+String(baud)+"</option>";
         page += "</select></label><label>Telemetry mesh channel index<input type=number name=mavChan min=0 max=7 value='"+String(settings.mavChannel)+"'></label>";
         page += "<label>Minimum mesh send interval (ms)<input type=number name=mavInterval min=1000 max=60000 value='"+String(settings.mavIntervalMs)+"'></label>";
-        page += F("<p class=hint>3.3V UART: RX D7/GPIO44, TX D6/GPIO43, common GND. Private channel required. Both directions off by default. Supported telemetry only; no flight commands. USB remains diagnostic.</p></fieldset><fieldset><legend>Boot portal</legend>");
+        page += F("<p class=hint>3.3V UART: RX D7/GPIO44, TX D6/GPIO43, common GND. Private channel required. Both directions off by default. Supported telemetry only; no flight commands. USB remains diagnostic.</p>");
+        page += F("</fieldset><fieldset><legend>XTOC Sentinel locations</legend>");
+        page += "<label>Position input<select name=sentinelSource>";
+        const char *sources[]={"Off","Serial MAVLink","Mesh MAVLink (SMV1)"};
+        for(unsigned i=0;i<3;++i) page += "<option value='"+String(i)+"'"+(settings.sentinelSource==i?" selected":"")+">"+sources[i]+"</option>";
+        page += "</select></label><label>MAVLink system ID<input type=number name=sentinelSystem min=1 max=255 value='"+String(settings.sentinelSystem)+"'></label>";
+        page += "<label>MAVLink component ID<input type=number name=sentinelComponent min=1 max=255 value='"+String(settings.sentinelComponent)+"'></label>";
+        char peerHex[9];snprintf(peerHex,sizeof(peerHex),"%08lX",(unsigned long)settings.sentinelPeer);
+        page += "<label>Mesh source node ID (8 hex digits; mesh input only)<input name=sentinelPeer maxlength=8 value='"+String(peerHex)+"'></label>";
+        page += "<label>Location report interval (seconds)<input type=number name=sentinelInterval min=5 max=3600 value='"+String(settings.sentinelIntervalSeconds)+"'></label>";
+        page += F("<p class=hint>Sends T=11 Sentinel reports on the Meshtastic output channel using the node label above. Requires a private channel, fresh 3D GPS fix and UTC time. Enable conversion at one endpoint only. XTOC can identify the node as a drone or another asset.</p></fieldset><fieldset><legend>Boot portal</legend>");
         page += "<label>Portal duration each boot, seconds<input type=number name=portalSec min=15 max=600 value='" + String(settings.portalSeconds) + "'></label></fieldset>";
         page += F("<button type=submit>Save and start detection</button></form><p><a href=/status style='color:#72d6a0'>View JSON status</a></p></body></html>");
         return page;
@@ -440,7 +491,7 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
     void handlePortalSave()
     {
         const SentinelSettings previous = settings;
-        const char *required[]={"motionPin","rssi","chanFirst","chanLast","dwell","ttl","wifiCool","motionCool","combine","heartbeat","portalSec","meshChan","mavBaud","mavChan","mavInterval"};
+        const char *required[]={"motionPin","rssi","chanFirst","chanLast","dwell","ttl","wifiCool","motionCool","combine","heartbeat","portalSec","meshChan","mavBaud","mavChan","mavInterval","sentinelSource","sentinelSystem","sentinelComponent","sentinelInterval"};
         for (const char *key: required) {
             String value=portalServer.arg(key);
             bool valid=value.length()>0 && value.length()<8;
@@ -484,6 +535,13 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
             settings=previous;portalServer.send(400,"text/plain","Invalid MAVLink bridge setting");return;
         }
         settings.mavBaud=baud;settings.mavChannel=channel;settings.mavIntervalMs=interval;
+        long source=portalServer.arg("sentinelSource").toInt(), system=portalServer.arg("sentinelSystem").toInt(), component=portalServer.arg("sentinelComponent").toInt(), reportInterval=portalServer.arg("sentinelInterval").toInt();
+        uint32_t peer=0;
+        if(source<0 || source>2 || system<1 || system>255 || component<1 || component>255 || reportInterval<5 || reportInterval>3600 ||
+            !sentinelPosition::parseNode(portalServer.arg("sentinelPeer").c_str(),peer) || (source==2 && !peer)) {
+            settings=previous;portalServer.send(400,"text/plain","Invalid Sentinel position settings; mesh input requires a nonzero source node ID");return;
+        }
+        settings.sentinelSource=source;settings.sentinelSystem=system;settings.sentinelComponent=component;settings.sentinelPeer=peer;settings.sentinelIntervalSeconds=reportInterval;
         if (!saveSettings()) {
             settings=previous;
             portalServer.send(500,"text/plain","Settings not saved. Try again; portal remains open.");
@@ -689,6 +747,7 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
         if (lastHeartbeatMs != 0 && now - lastHeartbeatMs < static_cast<uint32_t>(settings.heartbeatSeconds) * 1000UL)
             return;
         lastHeartbeatMs = now;
+        Serial.printf("[SENTINEL] position_reports=%lu fresh_fix=%u UTC=%u\n",(unsigned long)positionSubmitted,mavPosition.fresh(now),sentinelPosition::epochValid(mavPosition.epoch));
         Serial.printf("[SENTINEL] mavlink mesh_submitted=%lu serial_frames=%lu dropped_or_replaced=%lu\n",
             (unsigned long)mavSubmitted,(unsigned long)mavSerialFrames,(unsigned long)mavDropped);
         uint32_t packets;

@@ -1,5 +1,11 @@
 # Build the First Node
 
+## Presence firmware update
+
+For the XIAO ESP32-S3/Wio-SX1262 target, follow the Presence guide below. The original PIR build in this page remains a separate standalone example.
+
+[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+
 1. Wire HC-SR501 `VCC` to the required supply, `GND` to ground, and `OUT` to GPIO 4.
 2. Open `arduino/SentinelClearDemo/SentinelClearDemo.ino`.
 3. Set a unique `NODE_ID`, operational `LABEL`, and real `LAT`/`LON`.

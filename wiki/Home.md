@@ -1,15 +1,21 @@
 # Sentinel Wiki
 
+## Presence firmware update
+
+The XIAO Presence target now supports RCWL motion, Wi-Fi activity, a two-way MAVLink bridge and MAVLink-derived Sentinel location reports for ground nodes and carried payloads.
+
+[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+
 Sentinel is an open-source field sensor for the MKME X Suite. XTOC and XCOM decode and display its reports, XINTEL provides local radio/SDR monitoring and packet ingest, and XCORE provides local AI-assisted analysis of XTOC/XCOM operational data. A node combines direct sensors, a controller, a transport, power, and an enclosure. Begin with one ESP32 and one PIR, prove a `T=11` packet end to end, then add only the sensing your mission requires.
 
 ## Start here
 
-1. [Parts and kits](Parts-and-Kits)
-2. [Build the first node](Build-the-First-Node)
-3. [Wiring reference](Wiring-Reference)
-4. [XTOC/XCOM integration](XTOC-XCOM-Integration)
-5. [Deployment and troubleshooting](Deployment-and-Troubleshooting)
-6. [Packet and firmware notes](Packet-and-Firmware)
+1. [Parts and kits](Parts-and-Kits.md)
+2. [Build the first node](Build-the-First-Node.md)
+3. [Wiring reference](Wiring-Reference.md)
+4. [XTOC/XCOM integration](XTOC-XCOM-Integration.md)
+5. [Deployment and troubleshooting](Deployment-and-Troubleshooting.md)
+6. [Packet and firmware notes](Packet-and-Firmware.md)
 
 ## X Suite projects
 

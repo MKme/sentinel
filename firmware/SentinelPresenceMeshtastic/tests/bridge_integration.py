@@ -8,11 +8,24 @@ prefix=r'''
 #define main parserTestsMain
 #include "mavlink_test.cpp"
 #undef main
+void put(std::vector<uint8_t>& f,unsigned at,uint64_t value,unsigned bytes) {
+    for(unsigned i=0;i<bytes;++i)f[10+at+i]=uint8_t(value>>(8*i));
+}
+Frame location(bool gps=true,uint8_t fix=3,uint64_t time=1791972000000000ULL,int32_t lat=-338651430,int32_t lon=1512099000) {
+    unsigned type=gps?2:4;auto f=frame(type,true);
+    if(gps) {put(f,0,time,8);put(f,28,fix,1);}
+    put(f,gps?8:4,uint32_t(lat),4);put(f,gps?12:8,uint32_t(lon),4);
+    f.resize(10+f[1]);auto crc=reference(f,types[type].extra);f.push_back(crc&255);f.push_back(crc>>8);
+    Frame result;result.size=f.size();memcpy(result.data,f.data(),f.size());return result;
+}
+
+#include "../overlay/src/modules/optional/SentinelPresence/SentinelPosition.h"
 #include <deque>
 #include <algorithm>
 uint32_t clockMs=0;
 uint32_t millis(){return clockMs;}
-constexpr int SERIAL_8N1=0, meshtastic_PortNum_PRIVATE_APP=256;
+constexpr int SERIAL_8N1=0, meshtastic_PortNum_PRIVATE_APP=256,meshtastic_PortNum_TEXT_MESSAGE_APP=1,RTCQualityDevice=1;
+uint32_t getValidTime(int){return 1791972000;}
 constexpr int meshtastic_Channel_Role_DISABLED=0,meshtastic_Channel_Role_SECONDARY=2;
 constexpr int meshtastic_Config_LoRaConfig_RegionCode_UNSET=0,RX_SRC_LOCAL=0;
 struct Log {template<class... A> void printf(const char*,A...) {}} Serial;
@@ -27,7 +40,7 @@ struct HardwareSerial {
  size_t write(const uint8_t*p,size_t n){assert(n<=3);output.insert(output.end(),p,p+n);return n;}
 };
 struct meshtastic_MeshPacket {
- uint32_t from=42;unsigned channel=0;bool want_ack=false;
+ uint32_t id=12345678,from=42;unsigned channel=0;bool want_ack=false;
  struct {int portnum=256;struct {uint8_t bytes[237]={};size_t size=0;}payload;}decoded;
 };
 struct Key {unsigned size=32;uint8_t bytes[32]={7};};
@@ -39,7 +52,7 @@ struct Service {std::vector<meshtastic_MeshPacket> sent;void sendToMesh(meshtast
 enum class ProcessMessage {CONTINUE};
 struct Base {virtual bool wantPacket(const meshtastic_MeshPacket*)=0;virtual ProcessMessage handleReceived(const meshtastic_MeshPacket&)=0;meshtastic_MeshPacket*allocDataPacket(){return new meshtastic_MeshPacket;}};
 SentinelSettings settings{};
-class Bridge:public Base {public:
+class Bridge:public Base {public: bool initialized=true,portalActive=false;
 '''
 tests=r'''
 };
@@ -95,6 +108,27 @@ int main(){
  for(auto c:b)stale.mavUart.input.push_back(c);
  stale.pollMavlink(clockMs);config.lora.tx_enabled=true;
  stale.pollMavlink(clockMs+30000);assert(mesh.sent.size()==2 && stale.mavDropped==1);
+ // Conversion works without either raw bridge switch.
+ settings=SentinelSettings{};settings.sentinelSource=1;mesh.sent.clear();clockMs=50000;
+ Bridge pos;auto gps=location();
+ for(unsigned i=0;i<gps.size;++i)pos.mavUart.input.push_back(gps.data[i]);
+ pos.pollMavlink(clockMs);pos.pollSentinelPosition(clockMs);
+ assert(pos.mavStarted && mesh.sent.size()==1 && mesh.sent[0].decoded.portnum==1);
+ assert(!memcmp(mesh.sent[0].decoded.payload.bytes,"X1.11.C.",8));
+ assert(pos.mavPosition.owner==99);
+ pos.pollSentinelPosition(clockMs+1000);assert(mesh.sent.size()==1);
+ pos.pollSentinelPosition(clockMs+15000);assert(mesh.sent.size()==1);
+ settings.sentinelSource=2;settings.sentinelPeer=42;Bridge remote;
+ std::vector<uint8_t> bytes(gps.data,gps.data+gps.size);auto incoming=packet(bytes);
+ incoming.from=43;remote.handleReceived(incoming);assert(!remote.mavPosition.valid);
+ incoming.from=42;remote.handleReceived(incoming);assert(remote.mavPosition.owner==42);
+ remote.pollMavlink(clockMs);assert(!remote.mavStarted);
+ channels.ch.settings.psk.size=1;remote.pollSentinelPosition(clockMs);assert(mesh.sent.size()==1);
+ channels.ch.settings.psk.size=32;remote.pollSentinelPosition(clockMs);assert(mesh.sent.size()==2);
+ clockMs+=14000;remote.handleReceived(incoming);assert(remote.mavPosition.at==50000);
+ remote.pollSentinelPosition(clockMs+1000);assert(mesh.sent.size()==2);
+ settings.sentinelSource=0;remote.pollSentinelPosition(clockMs);assert(mesh.sent.size()==2);
+ puts("PASS: serial/mesh position conversion, selected peer, private output, rate, stale/duplicate suppression, disabled source");
  puts("PASS: actual bridge methods, directions, UART pins/baud, rate scheduling, private channel/radio gates, partial writes, duplicate and echo suppression");
 }
 '''

@@ -1,5 +1,11 @@
 # Deployment and Troubleshooting
 
+## Presence firmware update
+
+For missing MAVLink locations, check selected source/peer/system/component, private output channel, RF TX, UTC and fresh GPS_RAW_INT 3D fix. USB fresh_fix and UTC flags explain suppression. Check the independent raw forwarding switches only when raw transport is required.
+
+[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+
 ## Acceptance
 
 - label, node ID, coordinates, and map marker agree

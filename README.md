@@ -6,7 +6,7 @@
 
 The **XIAO ESP32-S3 + Wio-SX1262** firmware combines RCWL-0516 motion sensing, passive Wi-Fi activity detection, USB diagnostics, selectable Meshtastic reports and an optional bidirectional MAVLink telemetry bridge. Standard Meshtastic forwarding provides the relay function according to the configured device role, hop limit and radio settings.
 
-The original Arduino examples remain available for direct `T=11 SENTINEL` import into XTOC and XCOM. The new Presence firmware sends **Meshtastic text alerts and optional status messages**; these are distinct from the binary `T=11` examples.
+The original Arduino examples remain available for direct `T=11 SENTINEL` import into XTOC and XCOM. The Presence firmware sends **Meshtastic sensor alerts, optional status messages and optional MAVLink-derived `T=11` location reports** for XTOC ingestion.
 
 Repository: <https://github.com/MKme/sentinel>
 
@@ -111,6 +111,14 @@ Start with an ESP32 DevKit and one HC-SR501 PIR. The supplied sketch needs no th
 7. Confirm the report appears in `Sentinel` and on the Tactical Map Sentinel layer.
 8. Walk-test the PIR, then test stillness, sunlight changes, warm-up, and the planned mounting position.
 
+## Drone and ground-node location reports
+
+Select serial UART or a specific mesh MAVLink source in **XTOC Sentinel locations**. Set a label such as `WRAITH-01`, the source system/component IDs and reporting interval. Fresh 3D GPS fixes become standard Sentinel position packets, with a stable node ID, over the selected private mesh channel. XTOC can auto-import them through its existing mesh packet path.
+
+![MAVLink to Sentinel location configuration](assets/presence/sentinel-location.png)
+
+*Source-rendered firmware controls with simulated settings. [Setup, wiring and verification guide](wiki/Presence-and-MAVLink.md). Physical radio acceptance remains pending.*
+
 ## Code included
 
 | Sketch | Purpose |
@@ -175,7 +183,7 @@ Do not charge loose lithium cells with improvised wiring. Use protected cells, a
 - [Deployment and troubleshooting](https://github.com/MKme/sentinel/wiki/Deployment-and-Troubleshooting)
 - [Packet and firmware notes](https://github.com/MKme/sentinel/wiki/Packet-and-Firmware)
 
-The rendered GitHub Wiki is published from the source-controlled pages in `wiki/`.
+Current source-controlled [wiki files](wiki/Home.md), including the [Presence and MAVLink guide](wiki/Presence-and-MAVLink.md), are maintained here. A separately hosted GitHub Wiki may require synchronization.
 
 ## Safe deployment checklist
 

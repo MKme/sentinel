@@ -1,5 +1,11 @@
 # XTOC and XCOM Integration
 
+## Presence firmware update
+
+XTOC connected-mesh auto-import can ingest the converted X1.11.C reports through its existing Sentinel decoder. Enable incoming auto-import and verify the displayed label/location. WRAITH-01 is a platform label; T=11 has no drone classification field. Live hardware import remains a bench acceptance step.
+
+[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+
 ## Import a report
 
 1. Copy the complete packet printed by the node.

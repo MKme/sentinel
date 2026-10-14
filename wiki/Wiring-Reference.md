@@ -1,5 +1,11 @@
 # Wiring Reference
 
+## Presence firmware update
+
+Presence UART: D7/GPIO44 RX connects to source TX; D6/GPIO43 TX connects to consumer RX; share GND and use 3.3 V TTL. USB diagnostics use 115200 baud. RCWL uses GPIO3 (alternate GPIO4).
+
+[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+
 ## Direct input pattern
 
 | Function | ESP32 example | Notes |

@@ -1,5 +1,11 @@
 # Packet and Firmware
 
+## Presence firmware update
+
+Presence can emit position-only Sentinel v1 reports with zero sensor readings, label, UTC minute, coordinates and stable node ID. Raw MAVLink uses PRIVATE_APP port 256 with SMV1 framing; converted X1.11.C reports use TEXT_MESSAGE_APP. These are distinct transports.
+
+[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+
 Sentinel uses X Suite template `T=11`. The v1 payload includes version, sensor count, time in Unix minutes, latitude/longitude at 1e-5 degrees, node ID, flags, optional IO masks, optional UTF-8 label, and repeated 1-byte type plus signed 16-bit value readings.
 
 The wrapper is:

@@ -10,6 +10,15 @@ int main() {
     s.motionCooldownSeconds=10;s.combinedWindowSeconds=10;
     s.heartbeatSeconds=60;s.portalSeconds=120;
     assert(validSettings(s));
+    SentinelSettingsV4 old{};memset(&old,0xff,sizeof(old));static_cast<SentinelSettingsV3&>(old)=s;
+    SentinelSettings migrated{};static_cast<SentinelSettingsV4&>(migrated)=old;
+    assert(migrated.sentinelSource==0 && migrated.sentinelSystem==1 && migrated.sentinelComponent==1 && migrated.sentinelIntervalSeconds==15);
+    auto position=s;position.sentinelSource=2;assert(!validSettings(position));
+    position.sentinelPeer=42;assert(validSettings(position));
+    position.sentinelSystem=0;assert(!validSettings(position));position.sentinelSystem=1;
+    position.sentinelIntervalSeconds=4;assert(!validSettings(position));
+    position.sentinelIntervalSeconds=3601;assert(!validSettings(position));
+    position.sentinelIntervalSeconds=15;position.sentinelSource=3;assert(!validSettings(position));
     for(unsigned pin=0;pin<49;++pin) {
         auto v=s;v.motionGpio=pin;
         assert(validSettings(v)==(pin==3||pin==4));

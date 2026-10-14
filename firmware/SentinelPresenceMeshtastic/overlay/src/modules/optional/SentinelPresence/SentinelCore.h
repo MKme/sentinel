@@ -21,11 +21,16 @@ struct SentinelSettingsV3 {
     bool meshHeartbeat;
 };
 
-struct SentinelSettings : SentinelSettingsV3 {
+struct SentinelSettingsV4 : SentinelSettingsV3 {
     bool mavSerialToMesh=false, mavMeshToSerial=false;
     uint8_t mavChannel=0;
     uint32_t mavBaud=57600;
     uint16_t mavIntervalMs=5000;
+};
+struct SentinelSettings : SentinelSettingsV4 {
+    uint8_t sentinelSource=0, sentinelSystem=1, sentinelComponent=1;
+    uint32_t sentinelPeer=0;
+    uint16_t sentinelIntervalSeconds=15;
 };
 inline bool validMavBaud(uint32_t n) { return n==9600 || n==19200 || n==38400 || n==57600 || n==115200; }
 inline bool validSettings(const SentinelSettings &s) {
@@ -43,7 +48,8 @@ inline bool validSettings(const SentinelSettings &s) {
         s.combinedWindowSeconds>=1 && s.combinedWindowSeconds<=300 &&
         s.heartbeatSeconds>=10 && s.heartbeatSeconds<=3600 &&
         s.portalSeconds>=15 && s.portalSeconds<=600 && s.meshChannelIndex<8 && s.mavChannel<8 && validMavBaud(s.mavBaud) &&
-        s.mavIntervalMs>=1000 && s.mavIntervalMs<=60000;
+        s.mavIntervalMs>=1000 && s.mavIntervalMs<=60000 && s.sentinelSource<=2 && s.sentinelSystem>0 && s.sentinelComponent>0 &&
+        (s.sentinelSource!=2 || s.sentinelPeer!=0) && s.sentinelIntervalSeconds>=5 && s.sentinelIntervalSeconds<=3600;
 }
 inline bool publicKey(const uint8_t *key, int length) {
     const uint8_t prefix[15]={0xd4,0xf1,0xbb,0x3a,0x20,0x29,0x07,0x59,0xf0,0xbc,0xff,0xab,0xcf,0x4e,0x69};

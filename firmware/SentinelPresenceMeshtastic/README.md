@@ -40,13 +40,13 @@ Save to persist settings and start detection. A failed save keeps the portal ope
 - Relay: normal Meshtastic forwarding, governed by the device's role and radio configuration. Turning off Sentinel reports does not disable standard Meshtastic traffic.
 - USB logging is a human-readable diagnostic stream. Use Bluetooth for Meshtastic configuration; do not mix a binary serial API client with these raw diagnostic lines.
 
-The node detects Wi-Fi activity, including activity outside the immediate mounting location. A silent device can remain undetected. Use motion sensing while stationary or landed. The optional MAVLink bridge forwards supported external telemetry. No flight commands, camera acquisition, onboard GPS driver or binary X Suite `T=11` encoding is added by this module.
+The node detects Wi-Fi activity, including activity outside the immediate mounting location. A silent device can remain undetected. Use motion sensing while stationary or landed. The optional MAVLink bridge forwards supported external telemetry. No flight commands, camera acquisition or onboard GPS driver is added by this module.
 
 This is a continuous receiver: automatic idle sleep is disabled while explicit shutdown and the upstream low-battery handling remain available. Size the supply for continuous Wi-Fi, Bluetooth and LoRa operation rather than a sleeping sensor's duty cycle.
 
 ## MAVLink serial / mesh bridge
 
-The boot portal offers independent **Serial RX to mesh** and **Mesh to serial TX** switches. Both default off, including when migrating existing Presence settings. Sensor reporting remains independently configurable. Existing saved sensor settings are retained through the `config3` to `config4` migration.
+The boot portal offers independent **Serial RX to mesh** and **Mesh to serial TX** switches. Both default off, including when migrating existing Presence settings. Sensor reporting remains independently configurable. Existing saved sensor settings are retained through the `config3`/`config4` to `config5` migration; position conversion defaults off.
 
 ![MAVLink telemetry forwarding options](../../assets/presence/mavlink-bridge.png)
 
@@ -72,6 +72,25 @@ Transport: Meshtastic `PRIVATE_APP` port 256, payload ASCII `SMV1` followed by e
 
 CRC-invalid, unsupported and flight-command frames are discarded. The serial parser has bounded storage and a 250 ms partial-frame timeout. Mesh-to-UART uses a bounded queue and nonblocking writes; overflow is dropped. A bounded 30-second exact-frame cache suppresses duplicate and immediate echo forwarding. This is best-effort telemetry, with no delivery guarantee, command path, mission/parameter transfer, or replacement for an aircraft's control link.
 
+## MAVLink locations as Sentinel packets
+
+Enable **XTOC Sentinel locations** to publish position-only `T=11` reports. This is independent of sensor alerts and the raw MAVLink forwarding switches; all three functions default off.
+
+![Sentinel location source, MAVLink identity and reporting interval](../../assets/presence/sentinel-location.png)
+
+*Actual firmware setup renderer with simulated settings. Choose Serial UART or Mesh SMV1 input; Off is the factory default.*
+
+1. Set the node label, for example `WRAITH-01` or `GROUND-01`. Select a private **Meshtastic output** channel. The location converter blocks public/default-key channels even if public sensor alerts are enabled.
+2. Choose **Serial MAVLink** for an attached telemetry source. Connect its 3.3 V TX to D7/GPIO44 and common ground; match the bridge baud setting. Neither raw bridge switch needs to be on for conversion.
+3. Alternatively choose **Mesh MAVLink (SMV1)**, select the bridge input channel and enter the originating Meshtastic node's eight hexadecimal digits without `!`. The upstream node must send supported `SMV1` MAVLink frames. Only this selected sender is converted; UART output can remain off. The raw bridge sends one frame per aggregate interval: five active types at the default five-second interval can leave 25 seconds between GPS frames. Reduce the source stream to the needed types or select a suitable faster bridge interval within the mesh capacity, and verify `fresh_fix` stays current.
+4. Match MAVLink system/component IDs (both default 1). Set the report interval, default 15 seconds, range 5–3600 seconds. Enable conversion at one endpoint per source to avoid duplicate reports.
+5. Save and let the portal close. Supply a continuing `GPS_RAW_INT` stream with a 3D-or-better fix. Both position and fix must be less than 15 seconds old. `GLOBAL_POSITION_INT` can update coordinates only while that GPS fix is fresh. Unknown UTC, invalid coordinates, lost fix or stale telemetry suppress reporting. UTC comes from the Meshtastic clock or a valid GPS epoch timestamp; boot-relative time is not UTC.
+6. Connect XTOC to the receiving mesh and enable incoming packet auto-import. Reports use the existing Sentinel decoder and appear as Sentinel data. Verify the label, stable node ID and location before deployment. Use the label to identify the carried platform; this packet does not invent a drone/entity-type field.
+
+The serial source uses this node's Meshtastic ID; mesh conversion preserves the selected originating node's ID. Each report is `X1.11.C.<packet-id>.1/1.<payload>` on `TEXT_MESSAGE_APP`, with Sentinel v1 location, UTC minute, label and **zero sensor readings**. Mode C is application-level clear encoding, carried over the configured private Meshtastic channel; it is not X Suite mode S. Incoming text is not fed back into the MAVLink converter.
+
+USB diagnostics at 115200 baud include `position_submitted`, `position_reports`, `fresh_fix` and `UTC`. A submission is not proof of delivery. Native extraction, actual bridge-path tests and the actual XTOC codec contract pass; physical UART, over-air reception and live XTOC import still require a two-node bench test.
+
 ## Local build
 
 The supported local build uses Meshtastic revision `47e129f4bdec33a5012851aa3546073aa87d9254`, the installed PlatformIO Espressif32 6.9.0 platform, Arduino ESP32 2.0.17 and the existing Meshtastic library cache. It does not download a replacement toolchain or alter the source checkout. The application is GPL-3.0, including upstream Meshtastic; preserve its source and notices when distributing binaries.
@@ -93,6 +112,9 @@ g++ -std=c++17 tests/core_test.cpp -o .build/core_test.exe
 g++ -std=c++17 tests/mavlink_test.cpp -o .build/mavlink_test.exe
 .\.build\mavlink_test.exe
 .\.build\core_test.exe
+g++ -std=c++17 tests/position_test.cpp -o .build/position_test.exe
+.\.build\position_test.exe | Tee-Object .build/position-fixture.txt
+node tests/xtoc_position_contract.cjs .build/position-fixture.txt
 python tests/bridge_integration.py
 python tests/render_portal.py
 ```

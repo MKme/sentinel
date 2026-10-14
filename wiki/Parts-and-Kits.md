@@ -1,5 +1,11 @@
 # Parts and Kits
 
+## Presence firmware update
+
+The Presence build uses XIAO ESP32-S3 with the matching Wio-SX1262 B2B assembly, RCWL-0516, suitable regulated power and antenna. MAVLink requires a compatible 3.3 V TTL telemetry source; no additional GPS driver is supplied.
+
+[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+
 ## One-node starter
 
 - ESP32 DevKit V1
