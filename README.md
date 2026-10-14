@@ -1,12 +1,85 @@
 # Sentinel
 
-![Sentinel open-source field sensor kit](assets/sentinel-hero.png)
+![Sentinel remote sensing, mesh telemetry and field relay with Wraith XDRONE carrier concept](assets/presence/sentinel-field-header.png)
 
-Sentinel is the open-source remote sensor project for the MKME X Suite. It turns inexpensive Arduino-compatible boards and off-the-shelf sensors into named, mapped field nodes that report motion, contact state, temperature, battery voltage, and custom readings to XTOC or XCOM using the compact `T=11 SENTINEL` packet.
+**Remote sensing. Mesh telemetry. Field relay.** Sentinel is the remote-sensing branch of the XNODE field-device concept, maintained in this repository for the MKME X Suite. Deploy a stationary sensor node or integrate a compact sensing and communications payload into an aircraft such as **Wraith XDRONE**.
+
+The **XIAO ESP32-S3 + Wio-SX1262** firmware combines RCWL-0516 motion sensing, passive Wi-Fi activity detection, USB diagnostics, selectable Meshtastic reports and an optional bidirectional MAVLink telemetry bridge. Standard Meshtastic forwarding provides the relay function according to the configured device role, hop limit and radio settings.
+
+The original Arduino examples remain available for direct `T=11 SENTINEL` import into XTOC and XCOM. The new Presence firmware sends **Meshtastic text alerts and optional status messages**; these are distinct from the binary `T=11` examples.
 
 Repository: <https://github.com/MKme/sentinel>
 
 > Sentinel is an awareness aid, not a certified alarm, security, fire, medical, or life-safety system. Do not directly control mains, machinery, weapons, pyrotechnics, vehicles, or hazardous loads.
+
+## Field roles
+
+| Role | Use |
+| --- | --- |
+| Ground sensing station | Monitor a gate, equipment site or stationary observation point for motion and nearby Wi-Fi activity. |
+| Mesh relay | Participate in the configured Meshtastic network and forward eligible packets. Antenna placement, terrain, role and channel settings determine coverage. |
+| Wraith sensing payload | Carry the small node as a separate payload; use its mesh link for sensor reports while retaining an independent flight-control system. |
+| Bench diagnostics | Inspect activity, signal strength, Wi-Fi channel, motion transitions, queue drops and scanner status over USB at 115200 baud. |
+
+Wi-Fi activity is a radio observation, not a person count or device identity. RCWL motion sensing is intended for a stationary or landed installation; movement of the aircraft changes the sensor's reference and can produce motion indications.
+
+## Configure the Presence node
+
+1. Power the node and join **`SENTINEL-xxxx`** within the boot setup window—**120 seconds** by default. The factory setup password is **`sentinel123`**. Configure in a controlled location; this is a local commissioning interface.
+2. Open **`http://192.168.4.1`**. Set a recognizable node label, motion input, Wi-Fi threshold and reporting intervals. The portal needs no internet, external fonts or scripts.
+
+![Sentinel boot setup screen showing identity, Wi-Fi detection, motion timing, mesh output and setup duration](assets/presence/setup-desktop.png)
+
+*Firmware setup-page capture with example settings and simulated Meshtastic channel names. [Full-size screen](assets/presence/setup-desktop.png) · [Phone layout](assets/presence/setup-mobile.png).*
+
+3. Choose **Send detections over Meshtastic** and the configured output channel. Optionally enable periodic sensor status. Configure the actual channel keys, RF region, modem preset and device role using the Meshtastic app over Bluetooth. This portal selects an existing channel; it does not create or key one.
+
+![Mesh output controls showing detection reports, optional periodic status, Field Team channel and public-channel opt-in](assets/presence/mesh-output.png)
+
+*Example channel selection. Public/open or well-known-key channels require explicit opt-in; disabled channels and an unconfigured radio cannot send Sentinel reports. Turning off Sentinel output leaves normal Meshtastic operation intact.*
+
+4. Select **Save and start detection**. Settings are retained in flash. The access point closes and scanning begins. Without a save, the node starts with its saved settings when the setup window expires. Restart to reopen setup.
+
+![Sentinel configuration-saved page directing the operator to USB diagnostics at 115200 baud](assets/presence/saved.png)
+
+*Firmware confirmation-page capture. Check the serial scanner status after this screen; a saved configuration does not confirm reception at another mesh node.*
+
+Example mesh messages:
+
+```text
+SENTINEL-04: WIFI DETECTED RSSI -58 WIFI-CH 6
+SENTINEL-04: MOTION DETECTED
+SENTINEL-04: MOTION+WIFI DETECTED
+SENTINEL-04: ONLINE WIFI 12 MOTION 0 SCAN OK
+```
+
+`WIFI` in the periodic report is the cumulative count of deduplicated observations since boot, not a current device population. The serial `mesh_submitted` message means the packet was handed to Meshtastic; verify arrival on the receiving node.
+
+**[Presence firmware, wiring and local build](firmware/SentinelPresenceMeshtastic/README.md)**
+
+## MAVLink telemetry over mesh
+
+Enable **Serial RX to mesh**, **Mesh to serial TX**, or both in the boot portal. The bridge uses a separate 3.3 V UART: **D7/GPIO44 RX**, **D6/GPIO43 TX**, common **GND**. Cross TX to RX at the connected device; USB remains the diagnostic console. Set the UART baud to match your telemetry device (default **57600**, 8N1).
+
+![MAVLink bridge setup with independent forwarding switches, UART baud, mesh channel and send interval](assets/presence/mavlink-bridge.png)
+
+*Source-rendered setup controls with simulated settings. Both directions default off. [Full-size bridge controls](assets/presence/mavlink-bridge.png).*
+
+On the aircraft or sensor side, enable serial RX to mesh. On the receiving side, enable mesh to serial TX and connect the UART to your telemetry display or a suitable USB-UART adapter. Use the same configured private Meshtastic channel/key on both nodes and select its local channel index on each. Configure keys and RF settings through Meshtastic Bluetooth. A public/default-key channel is blocked for MAVLink regardless of the sensor-alert opt-in.
+
+Supported MAVLink 1/2 telemetry: **HEARTBEAT, SYS_STATUS, GPS_RAW_INT, ATTITUDE and GLOBAL_POSITION_INT**. Checksums are validated; accepted frames, including MAVLink 2 signature bytes, are forwarded unchanged. Signature authentication remains the receiving MAVLink endpoint's responsibility. Flight commands, parameter/mission transfers and other message types are excluded.
+
+The bridge sends at most one frame per configured interval (**5 seconds** by default), rotating among the latest observations of each supported type. This is low-rate situational telemetry, not a full-rate flight link. Both endpoints need this bridge firmware; ordinary Meshtastic text messages are not decoded as MAVLink. See [wiring, message format and bench checks](firmware/SentinelPresenceMeshtastic/README.md#mavlink-serial--mesh-bridge).
+
+## Wraith / XDRONE payload integration
+
+![Wraith XDRONE internal CAD layout for planning a separate sensing and communications payload](assets/presence/wraith-internal.png)
+
+*Wraith development CAD. The image shows the aircraft architecture, not a fitted Sentinel installation.*
+
+Treat Sentinel as a separately powered and secured sensing/communications payload. Plan a suitable regulated supply, antenna clearance, access to USB and the setup window, strain relief and a mount that preserves aircraft balance and cooling. Keep the node and wiring clear of the EDF, servos and flight-control connections. Verify interference and sensing behavior with the propulsion system operating before an airborne installation.
+
+The optional MAVLink bridge forwards supported serial telemetry over mesh in either direction. It does not forward flight commands. Aircraft payload fit and flight acceptance are separate from the sensing code. [Full aircraft CAD view](assets/presence/wraith-cad.png).
 
 ## What you can build
 
@@ -42,6 +115,7 @@ Start with an ESP32 DevKit and one HC-SR501 PIR. The supplied sketch needs no th
 
 | Sketch | Purpose |
 | --- | --- |
+| [`SentinelPresenceMeshtastic`](firmware/SentinelPresenceMeshtastic/README.md) | XIAO ESP32-S3/SX1262 sensing and mesh node with boot configuration portal, motion/Wi-Fi alerts, optional status reports and USB diagnostics |
 | [`SentinelClearDemo.ino`](arduino/SentinelClearDemo/SentinelClearDemo.ino) | reads a motion input, builds the binary Sentinel v1 payload, base64url-encodes it, and prints a complete clear `T=11` wrapper |
 | [`SentinelControlDemo.ino`](arduino/SentinelControlDemo/SentinelControlDemo.ino) | decodes clear `T=16 CONTROL`, applies an 8-bit low-voltage output bank, and emits a `T=11` acknowledgement with the resulting `outMask` |
 
