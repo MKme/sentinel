@@ -4,7 +4,7 @@ import markdown
 
 root=Path(__file__).resolve().parents[1]
 repo=root.parents[1]
-for doc in (repo/'README.md',root/'README.md',repo/'wiki/Presence-and-MAVLink.md'):
+for doc in (repo/'README.md',root/'README.md',repo/'wiki/Presence-and-MAVLink.md',repo/'wiki/Flight-Controller-Link.md'):
     content=doc.read_text(encoding='utf-8')
     assert not re.search(r'\[Wraith[^\]]*\]\(https?://',content,re.I), 'Keep aircraft imagery self-contained'
     assert not re.search(r'CAD[^\n]*from[^\n]*repositor',content,re.I), 'Do not disclose CAD source attribution'
@@ -17,7 +17,7 @@ for doc in (repo/'README.md',root/'README.md',repo/'wiki/Presence-and-MAVLink.md
             assert (doc.parent/ref.split('#')[0]).exists(),ref
     assert 'simulated' in content and '115200' in content
     html=markdown.markdown(content,extensions=['tables','fenced_code'])
-    name='wiki-guide.html' if doc.parent.name=='wiki' else 'readme.html' if doc.parent==repo else 'firmware-readme.html'
+    name='wiki-'+doc.stem.lower()+'.html' if doc.parent.name=='wiki' else 'readme.html' if doc.parent==repo else 'firmware-readme.html'
     out=root/'.build/portal-preview'/name
     out.write_text('<!doctype html><html><head><meta charset="utf-8"><base href="'+doc.parent.as_uri()+'/">'
         '<style>body{font:16px system-ui;line-height:1.55;color:#24292f;max-width:1000px;margin:40px auto;padding:20px}'

@@ -20,6 +20,7 @@ Frame location(bool gps=true,uint8_t fix=3,uint64_t time=1791972000000000ULL,int
 }
 
 #include "../overlay/src/modules/optional/SentinelPresence/SentinelPosition.h"
+#include "../overlay/src/modules/optional/SentinelPresence/SentinelFlight.h"
 #include <deque>
 #include <algorithm>
 uint32_t clockMs=0;
@@ -40,7 +41,7 @@ struct HardwareSerial {
  size_t write(const uint8_t*p,size_t n){assert(n<=3);output.insert(output.end(),p,p+n);return n;}
 };
 struct meshtastic_MeshPacket {
- uint32_t id=12345678,from=42;unsigned channel=0;bool want_ack=false;
+ uint32_t id=12345678,from=42,to=99;unsigned channel=0,hop_limit=0;bool want_ack=false,via_mqtt=false;
  struct {int portnum=256;struct {uint8_t bytes[237]={};size_t size=0;}payload;}decoded;
 };
 struct Key {unsigned size=32;uint8_t bytes[32]={7};};
@@ -60,7 +61,25 @@ meshtastic_MeshPacket packet(const std::vector<uint8_t>&f) {
  meshtastic_MeshPacket p;p.decoded.payload.size=f.size()+4;
  memcpy(p.decoded.payload.bytes,"SMV1",4);memcpy(p.decoded.payload.bytes+4,f.data(),f.size());return p;
 }
-int main(){
+int main(int argc,char **argv){
+ if(argc==3) {
+   settings.flightEnabled=true;settings.flightPeer=42;clockMs=10000;
+   Bridge air;air.pollMavlink(clockMs);meshtastic_MeshPacket p;
+   const char *hex=argv[2];size_t n=strlen(hex)/2;assert(n<=sizeof(p.decoded.payload.bytes));
+   for(size_t i=0;i<n;++i){unsigned b=0;assert(sscanf(hex+2*i,"%2x",&b)==1);p.decoded.payload.bytes[i]=b;}
+   p.decoded.payload.size=n;
+   if(!strcmp(argv[1],"up")) {
+     air.handleReceived(p);
+     for(unsigned i=0;i<80;++i)air.pollMavlink(clockMs);
+     for(auto b:air.mavUart.output)printf("%02x",b);
+   } else {
+     for(size_t i=0;i<n;++i)air.mavUart.input.push_back(p.decoded.payload.bytes[i]);
+     air.pollMavlink(clockMs);
+     for(auto &sent:mesh.sent)for(size_t i=0;i<sent.decoded.payload.size;++i)printf("%02x",sent.decoded.payload.bytes[i]);
+   }
+   puts("");return 0;
+ }
+
  parserTestsMain();
  Bridge off;off.pollMavlink(10000);assert(!off.mavStarted);
  settings.mavSerialToMesh=true;settings.mavMeshToSerial=true;
@@ -128,6 +147,30 @@ int main(){
  clockMs+=14000;remote.handleReceived(incoming);assert(remote.mavPosition.at==50000);
  remote.pollSentinelPosition(clockMs+1000);assert(mesh.sent.size()==2);
  settings.sentinelSource=0;remote.pollSentinelPosition(clockMs);assert(mesh.sent.size()==2);
+ settings=SentinelSettings{};settings.flightEnabled=true;settings.flightPeer=42;clockMs=10000;mesh.sent.clear();
+ Bridge air;air.pollMavlink(clockMs);
+ std::vector<uint8_t> cmd(10+33,0);cmd[0]=0xfd;cmd[1]=33;cmd[2]=1;cmd[5]=255;cmd[6]=190;cmd[7]=76;
+ cmd[10+28]=20;cmd[10+30]=1;cmd[10+31]=1;
+ auto crc=reference(cmd,152);cmd.push_back(crc&255);cmd.push_back(crc>>8);cmd.resize(cmd.size()+13,0x55);
+ Frame request;request.size=cmd.size();memcpy(request.data,cmd.data(),cmd.size());
+ assert(sentinelMav::validate(request.data,request.size,true)>=0); // request is flight-only
+ assert(sentinelMav::validate(request.data,request.size)<0);
+ meshtastic_MeshPacket flight;flight.decoded.payload.size=sentinelFlight::encode(request,1791972000,flight.decoded.payload.bytes);
+ flight.from=43;air.handleReceived(flight);assert(air.flightUart.empty());flight.from=42;
+ flight.to=0xffffffff;air.handleReceived(flight);assert(air.flightUart.empty());flight.to=99;
+ flight.via_mqtt=true;air.handleReceived(flight);assert(air.flightUart.empty());flight.via_mqtt=false;
+ channels.ch.settings.psk.size=1;air.handleReceived(flight);assert(air.flightUart.empty());channels.ch.settings.psk.size=32;
+ flight.decoded.payload.size=sentinelFlight::encode(request,1791971990,flight.decoded.payload.bytes);
+ air.handleReceived(flight);assert(air.flightUart.empty());
+ flight.decoded.payload.size=sentinelFlight::encode(request,1791972000,flight.decoded.payload.bytes);
+ air.handleReceived(flight);air.handleReceived(flight);assert(air.flightUart.tail==1);
+ for(unsigned i=0;i<80;++i)air.pollMavlink(clockMs);
+ assert(air.mavUart.output==cmd);
+ // Supported controller telemetry returns as paired unicast SMF1.
+ auto hb=frame(0,true);for(auto c:hb)air.mavUart.input.push_back(c);air.pollMavlink(clockMs);
+ assert(mesh.sent.size()==1 && mesh.sent[0].to==42 && mesh.sent[0].hop_limit==0 && !mesh.sent[0].want_ack);
+ assert(!memcmp(mesh.sent[0].decoded.payload.bytes,"SMF1",4));
+ puts("PASS: flight paired sender/destination/channel, MQTT rejection, expiry, duplicate suppression, byte-exact UART and downlink");
  puts("PASS: serial/mesh position conversion, selected peer, private output, rate, stale/duplicate suppression, disabled source");
  puts("PASS: actual bridge methods, directions, UART pins/baud, rate scheduling, private channel/radio gates, partial writes, duplicate and echo suppression");
 }

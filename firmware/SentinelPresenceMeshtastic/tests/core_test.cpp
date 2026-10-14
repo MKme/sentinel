@@ -13,6 +13,12 @@ int main() {
     SentinelSettingsV4 old{};memset(&old,0xff,sizeof(old));static_cast<SentinelSettingsV3&>(old)=s;
     SentinelSettings migrated{};static_cast<SentinelSettingsV4&>(migrated)=old;
     assert(migrated.sentinelSource==0 && migrated.sentinelSystem==1 && migrated.sentinelComponent==1 && migrated.sentinelIntervalSeconds==15);
+    SentinelSettingsV5 prior{};static_cast<SentinelSettingsV4&>(prior)=s;prior.sentinelSource=1;
+    SentinelSettings upgrade{};static_cast<SentinelSettingsV5&>(upgrade)=prior;
+    assert(!upgrade.flightEnabled && !upgrade.flightPeer && upgrade.flightSystem==1 && upgrade.sentinelSource==1);
+    auto flight=s;flight.flightEnabled=true;assert(!validSettings(flight));flight.flightPeer=42;assert(validSettings(flight));
+    flight.mavMeshToSerial=true;assert(!validSettings(flight));flight.mavMeshToSerial=false;
+    flight.flightIntervalMs=249;assert(!validSettings(flight));
     auto position=s;position.sentinelSource=2;assert(!validSettings(position));
     position.sentinelPeer=42;assert(validSettings(position));
     position.sentinelSystem=0;assert(!validSettings(position));position.sentinelSystem=1;

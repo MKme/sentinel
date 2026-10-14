@@ -12,6 +12,8 @@ const dir=path.join(repo,'assets/presence');fs.mkdirSync(dir,{recursive:true});
  if(await page.locator('input[name=mavOut]').isChecked() || await page.locator('input[name=mavIn]').isChecked())throw Error('Bridge must default off');
  if(await page.locator('select[name=mavBaud]').inputValue()!=='57600')throw Error('Wrong bridge baud');
  if(await page.locator('input[name=mavInterval]').inputValue()!=='5000')throw Error('Wrong bridge interval');
+ if(await page.locator('input[name=flightOn]').isChecked())throw Error('Aircraft flight link must default off');
+ await page.locator('fieldset').filter({has:page.locator('legend',{hasText:'Aircraft flight-controller link'})}).screenshot({path:path.join(dir,'flight-link.png')});
  if(await page.locator('select[name=sentinelSource]').inputValue()!=='0')throw Error('Position default must be off');
  await page.locator('fieldset').filter({has:page.locator('legend',{hasText:'XTOC Sentinel locations'})}).screenshot({path:path.join(dir,'sentinel-location.png')});
  await page.screenshot({path:path.join(dir,'setup-desktop.png'),fullPage:true});

@@ -8,6 +8,7 @@
 #include "SentinelCore.h"
 #include "SentinelMavlink.h"
 #include "SentinelPosition.h"
+#include "SentinelFlight.h"
 #include "RTC.h"
 #include "Channels.h"
 #include "MeshService.h"
@@ -86,17 +87,24 @@ void loadSettings()
     Preferences p;
     if (!p.begin("sentinel", true)) return;
     SentinelSettings saved = {};
-    if (p.getBytesLength("config5") == sizeof(saved) &&
-        p.getBytes("config5", &saved, sizeof(saved)) == sizeof(saved) && validSettings(saved))
+    if (p.getBytesLength("config6") == sizeof(saved) &&
+        p.getBytes("config6", &saved, sizeof(saved)) == sizeof(saved) && validSettings(saved))
         settings = saved;
-    else if (p.getBytesLength("config5")==0 && p.getBytesLength("config4")==sizeof(SentinelSettingsV4)) {
+    else if(p.getBytesLength("config6")==0 && p.getBytesLength("config5")==sizeof(SentinelSettingsV5)) {
+        SentinelSettingsV5 legacy{};SentinelSettings migrated{};
+        if(p.getBytes("config5",&legacy,sizeof(legacy))==sizeof(legacy)) {
+            static_cast<SentinelSettingsV5&>(migrated)=legacy;
+            if(validSettings(migrated))settings=migrated;
+        }
+    }
+    else if (p.getBytesLength("config6")==0 && p.getBytesLength("config5")==0 && p.getBytesLength("config4")==sizeof(SentinelSettingsV4)) {
         SentinelSettingsV4 legacy{};SentinelSettings migrated{};
         if(p.getBytes("config4",&legacy,sizeof(legacy))==sizeof(legacy)) {
             static_cast<SentinelSettingsV4&>(migrated)=legacy;
             if(validSettings(migrated)) settings=migrated;
         }
     }
-    else if (p.getBytesLength("config5")==0 && p.getBytesLength("config4")==0 && p.getBytesLength("config3")==sizeof(SentinelSettingsV3)) {
+    else if (p.getBytesLength("config6")==0 && p.getBytesLength("config5")==0 && p.getBytesLength("config4")==0 && p.getBytesLength("config3")==sizeof(SentinelSettingsV3)) {
         SentinelSettingsV3 legacy{};SentinelSettings migrated{};
         if(p.getBytes("config3",&legacy,sizeof(legacy))==sizeof(legacy)) {
             static_cast<SentinelSettingsV3&>(migrated)=legacy;
@@ -111,9 +119,9 @@ bool saveSettings()
     if (!validSettings(settings)) return false;
     Preferences p;
     if (!p.begin("sentinel", false)) return false;
-    bool ok = p.putBytes("config5", &settings, sizeof(settings)) == sizeof(settings);
+    bool ok = p.putBytes("config6", &settings, sizeof(settings)) == sizeof(settings);
     SentinelSettings check = {};
-    ok = ok && p.getBytes("config5", &check, sizeof(check)) == sizeof(check) &&
+    ok = ok && p.getBytes("config6", &check, sizeof(check)) == sizeof(check) &&
          memcmp(&check, &settings, sizeof(check)) == 0;
     p.end();
     Serial.printf("[SENTINEL] settings_saved=%s\n", ok ? "true" : "false");
@@ -255,6 +263,72 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
     unsigned mavNext=0, mavRead=0, mavWrite=0, mavOffset=0;
     uint32_t mavLastSend=0, mavSubmitted=0, mavSerialFrames=0, mavDropped=0;
 
+    sentinelFlight::Queue<4> flightUart;
+    sentinelFlight::Queue<8> flightResponses;
+    sentinelMav::Frame flightLatest[sentinelMav::flightTypeCount];
+    uint32_t flightLatestAt[sentinelMav::flightTypeCount]={};
+    sentinelMav::Recent flightSeen;
+    uint32_t flightClock=0,flightClockAt=0,flightSentAt=0,flightHeartbeatAt=0,flightDropped=0;
+    unsigned flightNext=0;
+    uint32_t flightUtc(uint32_t now) {
+        uint32_t rtc=getValidTime(RTCQualityDevice);
+        if(sentinelPosition::epochValid(rtc))return rtc;
+        return flightClock && uint32_t(now-flightClockAt)<60000?flightClock+uint32_t(now-flightClockAt)/1000:0;
+    }
+    void flightObserve(const sentinelMav::Frame &f,uint32_t now) {
+        int type=sentinelMav::validate(f.data,f.size,true);
+        if(type<0 || !sentinelFlight::identity(f,settings.flightSystem,settings.flightComponent))return;
+        int id=sentinelMav::flightTypes[type].id;
+        if(id==24) {
+            uint64_t micros=uint64_t(sentinelFlight::word(f,0))|(uint64_t(sentinelFlight::word(f,4))<<32);
+            uint64_t seconds=micros/1000000ULL;
+            if(seconds<=UINT32_MAX && sentinelPosition::epochValid(uint32_t(seconds))) {flightClock=seconds;flightClockAt=now;}
+        }
+        if(sentinelFlight::response(id)) {if(!flightResponses.push(f,now))++flightDropped;}
+        else if(sentinelFlight::telemetry(id)) {flightLatest[type]=f;flightLatestAt[type]=now;}
+    }
+    void flightReceive(const meshtastic_MeshPacket &p) {
+        uint32_t now=millis();sentinelMav::Frame f;
+        if(!settings.flightEnabled || p.channel!=settings.flightChannel || p.from!=settings.flightPeer ||
+            p.to!=nodeDB->getNodeNum() || p.via_mqtt || !privateChannelAllowed(settings.flightChannel,false) ||
+            !sentinelFlight::decode(p.decoded.payload.bytes,p.decoded.payload.size,flightUtc(now),f) ||
+            !sentinelFlight::request(f,settings.flightSystem,settings.flightComponent) || flightSeen.contains(f,now))return;
+        // Remember even overflowed requests: never execute a radio retry after local congestion clears.
+        flightSeen.add(f,now);
+        if(!flightUart.push(f,now))++flightDropped;
+    }
+    void pollFlight(uint32_t now) {
+        if(!settings.flightEnabled)return;
+        if(!flightUart.empty()) {
+            auto &f=flightUart.frames[flightUart.head];
+            if(!flightUart.offset && uint32_t(now-flightUart.times[flightUart.head])>1000) {flightUart.pop();++flightDropped;}
+            else {
+                size_t n=mavUart.availableForWrite();if(n>f.size-flightUart.offset)n=f.size-flightUart.offset;
+                if(n)flightUart.offset+=mavUart.write(f.data+flightUart.offset,n);
+                if(flightUart.offset==f.size)flightUart.pop();
+            }
+        }
+        if(uint32_t(now-flightSentAt)<settings.flightIntervalMs || !privateChannelAllowed(settings.flightChannel,true) ||
+            !sentinelPosition::epochValid(flightUtc(now)))return;
+        while(!flightResponses.empty() && uint32_t(now-flightResponses.times[flightResponses.head])>=5000) {flightResponses.pop();++flightDropped;}
+        sentinelMav::Frame *f=nullptr;int slot=-1;
+        if(!flightResponses.empty())f=&flightResponses.frames[flightResponses.head];
+        else if(flightLatest[0].size && uint32_t(now-flightHeartbeatAt)>=2000) {slot=0;f=&flightLatest[0];}
+        else for(unsigned i=0;i<sentinelMav::flightTypeCount;++i) {
+            unsigned n=(flightNext+i)%sentinelMav::flightTypeCount;
+            if(flightLatest[n].size) {slot=n;f=&flightLatest[n];break;}
+        }
+        if(!f)return;
+        if(slot>=0 && uint32_t(now-flightLatestAt[slot])>=5000) {f->size=0;return;}
+        auto *p=allocDataPacket();if(!p)return;
+        p->decoded.portnum=meshtastic_PortNum_PRIVATE_APP;p->channel=settings.flightChannel;
+        p->to=settings.flightPeer;p->hop_limit=0;p->want_ack=false;
+        uint32_t observed=slot<0?flightResponses.times[flightResponses.head]:flightLatestAt[slot];
+        p->decoded.payload.size=sentinelFlight::encode(*f,flightUtc(now)-uint32_t(now-observed)/1000,p->decoded.payload.bytes);
+        service->sendToMesh(p,RX_SRC_LOCAL,true);flightSentAt=now;
+        if(slot<0)flightResponses.pop();
+        else {if(slot==0)flightHeartbeatAt=now;f->size=0;flightNext=(slot+1)%sentinelMav::flightTypeCount;}
+    }
     sentinelPosition::Position mavPosition;
     sentinelMav::Recent positionRecent;
     void capturePosition(const sentinelMav::Frame &f,uint32_t owner,uint32_t now) {
@@ -290,7 +364,9 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
         return p->decoded.portnum==meshtastic_PortNum_PRIVATE_APP;
     }
     ProcessMessage handleReceived(const meshtastic_MeshPacket &p) override {
-        if(!initialized || portalActive || p.channel!=settings.mavChannel ||
+        if(!initialized || portalActive)return ProcessMessage::CONTINUE;
+        if(p.decoded.payload.size>=4 && !memcmp(p.decoded.payload.bytes,"SMF1",4)) {flightReceive(p);return ProcessMessage::CONTINUE;}
+        if(settings.flightEnabled || p.channel!=settings.mavChannel ||
             p.from==nodeDB->getNodeNum() || !mavChannelAllowed(false)) return ProcessMessage::CONTINUE;
         sentinelMav::Frame f;
         if(!sentinelMav::decode(p.decoded.payload.bytes,p.decoded.payload.size,f)) {++mavDropped;return ProcessMessage::CONTINUE;}
@@ -305,25 +381,28 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
     }
     void pollMavlink(uint32_t now) {
         if(!mavStarted) {
-            if(!settings.mavSerialToMesh && !settings.mavMeshToSerial && settings.sentinelSource!=1) return;
+            if(!settings.mavSerialToMesh && !settings.mavMeshToSerial && settings.sentinelSource!=1 && !settings.flightEnabled) return;
             mavUart.setRxBufferSize(2048);
             mavUart.begin(settings.mavBaud,SERIAL_8N1,44,43);
             mavStarted=true;
             Serial.printf("[SENTINEL] mavlink_uart RX=44 TX=43 baud=%lu serial_to_mesh=%u mesh_to_serial=%u channel=%u interval_ms=%u\n",
                 (unsigned long)settings.mavBaud,settings.mavSerialToMesh,settings.mavMeshToSerial,settings.mavChannel,settings.mavIntervalMs);
         }
+        mavParser.flight=settings.flightEnabled;
         for(unsigned budget=0;budget<1024 && mavUart.available();++budget) {
             uint8_t b=mavUart.read();
             sentinelMav::Frame f;
             if(mavParser.feed(b,now,f) && !mavRecent.contains(f,now)) {
                 if(settings.sentinelSource==1)
                     capturePosition(f,nodeDB->getNodeNum(),now);
+                if(settings.flightEnabled) {flightObserve(f,now);continue;}
                 if(!settings.mavSerialToMesh) continue;
                 int type=sentinelMav::validate(f.data,f.size);
                 if(mavPending[type].size) ++mavDropped;
                 mavPending[type]=f;mavPendingAt[type]=now;
             }
         }
+        if(settings.flightEnabled) {pollFlight(now);return;}
         if(mavRead!=mavWrite) {
             auto &f=mavTx[mavRead];
             size_t count=mavUart.availableForWrite();
@@ -435,6 +514,15 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
         page += "</select></label><label>Telemetry mesh channel index<input type=number name=mavChan min=0 max=7 value='"+String(settings.mavChannel)+"'></label>";
         page += "<label>Minimum mesh send interval (ms)<input type=number name=mavInterval min=1000 max=60000 value='"+String(settings.mavIntervalMs)+"'></label>";
         page += F("<p class=hint>3.3V UART: RX D7/GPIO44, TX D6/GPIO43, common GND. Private channel required. Both directions off by default. Supported telemetry only; no flight commands. USB remains diagnostic.</p>");
+        page += F("</fieldset><fieldset><legend>Aircraft flight-controller link</legend>");
+        page += "<label class=check><input type=checkbox name=flightOn"+checked(settings.flightEnabled)+">Enable paired aircraft UART link</label>";
+        char groundHex[9];snprintf(groundHex,sizeof(groundHex),"%08lX",(unsigned long)settings.flightPeer);
+        page += "<label>Ground node ID (8 hex digits)<input name=flightPeer maxlength=8 value='"+String(groundHex)+"'></label>";
+        page += "<label>Private flight channel index<input type=number name=flightChannel min=0 max=7 value='"+String(settings.flightChannel)+"'></label>";
+        page += "<label>Flight-controller system ID<input type=number name=flightSystem min=1 max=255 value='"+String(settings.flightSystem)+"'></label>";
+        page += "<label>Flight-controller component ID<input type=number name=flightComponent min=1 max=255 value='"+String(settings.flightComponent)+"'></label>";
+        page += "<label>Minimum downlink interval (ms)<input type=number name=flightInterval min=250 max=2000 value='"+String(settings.flightIntervalMs)+"'></label>";
+        page += F("<p class=hint>Aircraft node only. Ground node uses USB Meshtastic API with XTOC Drones Bridge. Disable both legacy bridge switches. Private channel, paired unicast peer, UTC clock and MAVLink signing required for requests. Configure the flight controller to verify signatures. Hold/Resume/RTL and mission transfer; no joystick or continuous guidance.</p>");
         page += F("</fieldset><fieldset><legend>XTOC Sentinel locations</legend>");
         page += "<label>Position input<select name=sentinelSource>";
         const char *sources[]={"Off","Serial MAVLink","Mesh MAVLink (SMV1)"};
@@ -491,7 +579,7 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
     void handlePortalSave()
     {
         const SentinelSettings previous = settings;
-        const char *required[]={"motionPin","rssi","chanFirst","chanLast","dwell","ttl","wifiCool","motionCool","combine","heartbeat","portalSec","meshChan","mavBaud","mavChan","mavInterval","sentinelSource","sentinelSystem","sentinelComponent","sentinelInterval"};
+        const char *required[]={"motionPin","rssi","chanFirst","chanLast","dwell","ttl","wifiCool","motionCool","combine","heartbeat","portalSec","meshChan","mavBaud","mavChan","mavInterval","sentinelSource","sentinelSystem","sentinelComponent","sentinelInterval","flightChannel","flightSystem","flightComponent","flightInterval"};
         for (const char *key: required) {
             String value=portalServer.arg(key);
             bool valid=value.length()>0 && value.length()<8;
@@ -541,6 +629,16 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
             !sentinelPosition::parseNode(portalServer.arg("sentinelPeer").c_str(),peer) || (source==2 && !peer)) {
             settings=previous;portalServer.send(400,"text/plain","Invalid Sentinel position settings; mesh input requires a nonzero source node ID");return;
         }
+        uint32_t ground=0;
+        long flightChannel=portalServer.arg("flightChannel").toInt(),flightSystem=portalServer.arg("flightSystem").toInt(),flightComponent=portalServer.arg("flightComponent").toInt(),flightInterval=portalServer.arg("flightInterval").toInt();
+        bool flightOn=portalServer.hasArg("flightOn");
+        if(!sentinelPosition::parseNode(portalServer.arg("flightPeer").c_str(),ground) || flightChannel<0 || flightChannel>7 ||
+            flightSystem<1 || flightSystem>255 || flightComponent<1 || flightComponent>255 || flightInterval<250 || flightInterval>2000 ||
+            (flightOn && (!ground || ground==UINT32_MAX || ground==nodeDB->getNodeNum() || settings.mavSerialToMesh || settings.mavMeshToSerial))) {
+            settings=previous;portalServer.send(400,"text/plain","Invalid flight link; select a paired ground node and disable legacy bridge switches");return;
+        }
+        settings.flightEnabled=flightOn;settings.flightPeer=ground;settings.flightChannel=flightChannel;
+        settings.flightSystem=flightSystem;settings.flightComponent=flightComponent;settings.flightIntervalMs=flightInterval;
         settings.sentinelSource=source;settings.sentinelSystem=system;settings.sentinelComponent=component;settings.sentinelPeer=peer;settings.sentinelIntervalSeconds=reportInterval;
         if (!saveSettings()) {
             settings=previous;

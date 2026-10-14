@@ -44,3 +44,7 @@ For raw serial-to-mesh or mesh-to-serial telemetry, use the independent switches
 *Both raw forwarding directions default off. Supported types: HEARTBEAT, SYS_STATUS, GPS_RAW_INT, ATTITUDE and GLOBAL_POSITION_INT; no command or mission transfer.*
 
 See the [firmware reference](../firmware/SentinelPresenceMeshtastic/README.md) for build steps, parser behavior, channel rules and the bench-test checklist.
+
+## Direct aircraft supervision
+
+Use the [paired flight-controller link](Flight-Controller-Link.md) for XTOC commands and returning telemetry through a USB ground node. This is separately enabled from the legacy telemetry bridge and T=11 position reporting.

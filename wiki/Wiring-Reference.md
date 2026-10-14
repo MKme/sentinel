@@ -20,3 +20,7 @@ All modules must share ground unless a professionally designed isolated interfac
 ## Output warning
 
 GPIO pins cannot drive coils, lamps, motors, or relays directly. The control demo is logic-level reference code. Use a suitable low-voltage driver, flyback protection for inductive loads, fuse, safe default state, and acknowledgement. Never use this project to switch mains or hazardous loads.
+
+## Direct aircraft supervision
+
+Use the [paired flight-controller link](Flight-Controller-Link.md) for XTOC commands and returning telemetry through a USB ground node. This is separately enabled from the legacy telemetry bridge and T=11 position reporting.

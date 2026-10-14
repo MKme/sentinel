@@ -25,3 +25,7 @@ XTOC connected-mesh auto-import can ingest the converted X1.11.C reports through
 ## CONTROL
 
 Compose `T=16 CONTROL` only for engineered low-voltage outputs. Target the exact node ID, prefer `SET`/`CLEAR` over ambiguous toggles, request acknowledgement, and confirm the resulting `outMask` report.
+
+## Direct aircraft supervision
+
+Use the [paired flight-controller link](Flight-Controller-Link.md) for XTOC commands and returning telemetry through a USB ground node. This is separately enabled from the legacy telemetry bridge and T=11 position reporting.
