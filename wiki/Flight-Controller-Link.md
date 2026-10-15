@@ -1,5 +1,9 @@
 # Sentinel flight-controller link
 
+![Wraith carries Sentinel wired to its autopilot; a USB ground radio exchanges mission actions and telemetry with the aircraft over paired LoRa](../assets/presence/wraith-link-illustration.png)
+
+*Concept illustration, not a tested installation or an application screenshot. Amber: mission actions. Cyan: position and status returning to XTOC. Pilot and video links remain separate.*
+
 ## Paired flight-controller link
 
 Connect an aircraft flight controller through Sentinel to a USB ground node and XTOC:

@@ -8,7 +8,9 @@ The XIAO Presence target now supports RCWL motion, Wi-Fi activity, a two-way MAV
 
 Sentinel is an open-source field sensor for the MKME X Suite. XTOC and XCOM decode and display its reports, XINTEL provides local radio/SDR monitoring and packet ingest, and XCORE provides local AI-assisted analysis of XTOC/XCOM operational data. A node combines direct sensors, a controller, a transport, power, and an enclosure. Begin with one ESP32 and one PIR, prove a `T=11` packet end to end, then add only the sensing your mission requires.
 
-![USB ground station and paired LoRa aircraft link](../assets/presence/link-overview.png)
+![Wraith with an onboard Sentinel-to-autopilot connection, paired LoRa mission uplink and telemetry return to a USB-connected XTOC ground station](../assets/presence/wraith-link-illustration.png)
+
+*Concept illustration; component placement and map display are illustrative. Amber: mission actions. Cyan: returning telemetry. Separate pilot and video links.*
 
 - **Aircraft supervision:** [Flight-controller setup](Flight-Controller-Link.md) for signed commands, missions and returning telemetry.
 - **Ground sensing or telemetry relay:** [Presence and MAVLink setup](Presence-and-MAVLink.md).

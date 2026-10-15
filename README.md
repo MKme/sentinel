@@ -113,7 +113,9 @@ Start with an ESP32 DevKit and one HC-SR501 PIR. The supplied sketch needs no th
 
 ## USB ground station and flight-controller link
 
-![How XTOC supervises an aircraft through two LoRa nodes](assets/presence/link-overview.png)
+![Wraith carries Sentinel connected to its autopilot by MAVLink; a USB ground radio sends mission actions over LoRa and returns position, battery and heartbeat to the XTOC map](assets/presence/wraith-link-illustration.png)
+
+*Concept illustration: onboard placement, electronics and map display are illustrative. Amber shows mission actions; cyan shows returning telemetry. Pilot and video links remain separate.*
 
 **Build with familiar parts:** a compatible Meshtastic USB ground radio, XIAO ESP32-S3 + Wio-SX1262 aircraft node and the autopilot's MAVLink UART. No cellular service or cloud relay is needed for this local path. LoRa carries compact commands and telemetry; the autopilot handles stabilization and flight execution. The paired flight path is direct, not a multi-hop command mesh.
 
