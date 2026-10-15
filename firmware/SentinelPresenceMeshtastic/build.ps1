@@ -17,6 +17,8 @@ if (-not (Test-Path -LiteralPath $BuildRoot)) {
     if ($LASTEXITCODE -ne 0) { throw 'Local preparation failed' }
 }
 Copy-Item -Path "$PSScriptRoot/overlay/*" -Destination $BuildRoot -Recurse -Force
+python "$PSScriptRoot/patch_local_input.py"
+if ($LASTEXITCODE -ne 0) { throw 'Local observation ingress hook failed' }
 pio run -d $BuildRoot -e sentinel-xiao-s3
 if ($LASTEXITCODE -ne 0) { throw 'Firmware build failed; no artifacts exported' }
 $Artifacts = Join-Path $PSScriptRoot 'artifacts'

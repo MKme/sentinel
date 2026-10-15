@@ -16,7 +16,7 @@ inline bool parseNode(const char *s,uint32_t &node) {
 }
 inline int32_t e5(int32_t e7) {int64_t n=int64_t(e7)+50;return n>=0?n/100:-((-n+99)/100);}
 struct Position {
-    bool valid=false,fix=false;uint32_t owner=0,at=0,fixAt=0,epoch=0,fixEpoch=0;
+    bool valid=false,fix=false,hasPosition=false;uint32_t owner=0,at=0,fixAt=0,epoch=0,fixEpoch=0;
     int32_t lat=0,lon=0;
     bool observe(const sentinelMav::Frame &f,uint32_t node,uint8_t system,uint8_t component,uint32_t now,uint32_t utc) {
         int type=sentinelMav::validate(f.data,f.size);
@@ -30,7 +30,7 @@ struct Position {
         uint32_t stamp=epochValid(utc)?utc:0;
         if(id==24) {
             // A new bad fix invalidates the previous sample immediately.
-            owner=node;valid=false;fix=false;
+            owner=node;valid=false;fix=false;hasPosition=false;
             if(byte(28)<3 || byte(28)>8)return false;
             uint64_t micros=uint64_t(u32(0))|(uint64_t(u32(4))<<32);
             uint64_t seconds=micros/1000000ULL;
@@ -42,7 +42,7 @@ struct Position {
         int32_t latitude=int32_t(u32(id==24?8:4)),longitude=int32_t(u32(id==24?12:8));
         if(latitude < -900000000 || latitude > 900000000 || longitude < -1800000000 || longitude > 1800000000) {valid=false;fix=false;return false;}
         if(id==24) {fix=true;fixAt=now;fixEpoch=stamp;}
-        lat=latitude;lon=longitude;at=now;epoch=stamp;owner=node;valid=epochValid(stamp);
+        lat=latitude;lon=longitude;at=now;epoch=stamp;owner=node;hasPosition=true;valid=epochValid(stamp);
         return valid;
     }
     bool fresh(uint32_t now) const {return valid && fix && uint32_t(now-at)<15000 && uint32_t(now-fixAt)<15000;}

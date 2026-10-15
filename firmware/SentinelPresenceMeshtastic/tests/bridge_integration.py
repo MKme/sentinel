@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess
 root=Path(__file__).resolve().parents[1]
 source=(root/'overlay/src/modules/optional/SentinelPresence/SentinelPresence.cpp').read_text()
-methods=source[source.index('    HardwareSerial mavUart'):source.index('    void initialize()')]
+methods=source[source.index('    bool localObservation'):source.index('  protected:')] + source[source.index('    HardwareSerial mavUart'):source.index('    void initialize()')]
 prefix=r'''
 #define main parserTestsMain
 #include "mavlink_test.cpp"
@@ -21,6 +21,8 @@ Frame location(bool gps=true,uint8_t fix=3,uint64_t time=1791972000000000ULL,int
 
 #include "../overlay/src/modules/optional/SentinelPresence/SentinelPosition.h"
 #include "../overlay/src/modules/optional/SentinelPresence/SentinelFlight.h"
+#include "../overlay/src/modules/optional/SentinelPresence/SentinelObservation.h"
+bool observationEnabled=false;uint16_t observationInterval=15;
 #include <deque>
 #include <algorithm>
 uint32_t clockMs=0;
@@ -170,6 +172,25 @@ int main(int argc,char **argv){
  auto hb=frame(0,true);for(auto c:hb)air.mavUart.input.push_back(c);air.pollMavlink(clockMs);
  assert(mesh.sent.size()==1 && mesh.sent[0].to==42 && mesh.sent[0].hop_limit==0 && !mesh.sent[0].want_ack);
  assert(!memcmp(mesh.sent[0].decoded.payload.bytes,"SMF1",4));
+ // Actual local ingress consumes SOI packets before RF and obeys output gates.
+ settings=SentinelSettings{};settings.meshOutput=true;mesh.sent.clear();clockMs=10000;Bridge observer;
+ uint8_t input[]={'S','O','I','1',1,0,0,0,0xf0,0x23,1,0,0,0,4,'F','I','R','E'};
+ assert(observer.localObservation(99,256,input,sizeof(input)));assert(observer.observations.size==0);
+ observationEnabled=true;
+ assert(observer.localObservation(98,256,input,sizeof(input)));assert(observer.observations.size==0);
+ assert(observer.localObservation(99,256,input,sizeof(input)));assert(observer.observations.size==1);
+ observer.localObservation(99,256,input,sizeof(input));assert(observer.observations.duplicates==1);
+ settings.meshOutput=false;observer.pollObservations(clockMs);assert(mesh.sent.empty());settings.meshOutput=true;
+ config.lora.tx_enabled=false;observer.pollObservations(clockMs);assert(mesh.sent.empty());config.lora.tx_enabled=true;
+ channels.ch.settings.psk.size=1;observer.pollObservations(clockMs);assert(mesh.sent.empty());channels.ch.settings.psk.size=32;
+ observer.pollObservations(clockMs);assert(mesh.sent.size()==1 && !observer.observations.size);
+ assert(mesh.sent[0].decoded.portnum==1 && !memcmp(mesh.sent[0].decoded.payload.bytes,"X1.11.C.",8));
+ meshtastic_MeshPacket rf;rf.decoded.payload.size=sizeof(input);memcpy(rf.decoded.payload.bytes,input,sizeof(input));observer.handleReceived(rf);assert(!observer.observations.size);
+ input[3]='2';observer.localObservation(99,256,input,sizeof(input));assert(!observer.observations.size);
+ input[3]='1';input[4]=2;clockMs=26000;observer.localObservation(99,256,input,sizeof(input));assert(observer.observations.size==1);
+ settings.flightEnabled=true;observer.flightSentAt=clockMs;observer.pollObservations(clockMs);assert(mesh.sent.size()==1);
+ clockMs+=30000;observer.pollObservations(clockMs);assert(!observer.observations.size && observer.observations.dropped==1);
+ puts("PASS: actual local observation ingress, disabled/wrong-node/RF rejection, duplicate, private TX gate, flight priority and queue expiry");
  puts("PASS: flight paired sender/destination/channel, MQTT rejection, expiry, duplicate suppression, byte-exact UART and downlink");
  puts("PASS: serial/mesh position conversion, selected peer, private output, rate, stale/duplicate suppression, disabled source");
  puts("PASS: actual bridge methods, directions, UART pins/baud, rate scheduling, private channel/radio gates, partial writes, duplicate and echo suppression");

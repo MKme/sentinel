@@ -27,6 +27,7 @@ public:
 };
 void strlcpy(char *to,const char *from,size_t size){std::strncpy(to,from,size-1);to[size-1]=0;}
 SentinelSettings settings;
+bool observationEnabled=true;uint16_t observationInterval=15;
 constexpr int meshtastic_Channel_Role_DISABLED=0;
 struct Channel {int role=1;};
 struct Channels {

@@ -10,6 +10,12 @@ The original Arduino examples remain available for direct `T=11 SENTINEL` import
 
 Repository: <https://github.com/MKme/sentinel>
 
+## Companion object observations
+
+Connect your own Raspberry Pi classifier over USB. Sentinel accepts a compact object label, confidence, count and observation ID, attaches the available MAVLink sensor position, and sends a normal `T=11` alert over the private mesh. Missing GPS still produces a report; old fixes are marked stale. Coordinates describe the observing sensor, not the detected object's position. Images and recognition software stay on your companion computer.
+
+Start with the [companion input contract and generic sender](firmware/SentinelPresenceMeshtastic/OBSERVATIONS.md) or the [wiki setup](wiki/Companion-Observations.md). In XTOC, install **Sentinel Object Observation Alerts** from XPASS, then configure and enable the **SOA** templates in **Triggers**. The example plugins and rules start disabled. Use an updated XTOC receiver supporting observation quality fields.
+
 > Sentinel is an awareness aid, not a certified alarm, security, fire, medical, or life-safety system. Do not wire sensor outputs to mains, machinery, vehicle controls or hazardous loads. Aircraft supervision uses the explicitly configured paired MAVLink interface described below.
 
 ## Field roles

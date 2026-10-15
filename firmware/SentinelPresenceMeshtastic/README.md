@@ -182,3 +182,7 @@ Run these commands from this firmware directory. UI capture tooling uses the alr
 The build overlays `overlay/src/modules/optional/SentinelPresence` and adds its setup call to the pinned Meshtastic module registry in the generated tree. The maintained upstream checkout remains untouched. The build's local Nanopb runtime uses Meshtastic's committed generated protobuf files, without invoking its optional Python generator installer.
 
 See [LICENSE](LICENSE) for firmware licensing and preserve the upstream dependency notices. The repository's original standalone examples retain their existing licence.
+
+## Companion observations
+
+Use [OBSERVATIONS.md](OBSERVATIONS.md) for the USB companion input contract, generic Python sender, GPS freshness rules and XTOC alert setup. This input is disabled by default and shares the normal Meshtastic local API. It does not accept raw USB text or require a camera model in the firmware.

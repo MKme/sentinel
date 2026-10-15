@@ -13,6 +13,7 @@ Sentinel is an open-source field sensor for the MKME X Suite. XTOC and XCOM deco
 *Concept illustration; component placement and map display are illustrative. Amber: mission actions. Cyan: returning telemetry. Separate pilot and video links.*
 
 - **Aircraft supervision:** [Flight-controller setup](Flight-Controller-Link.md) for signed commands, missions and returning telemetry.
+- **Companion classifier:** [Object observation setup](Companion-Observations.md) for USB input, GPS quality and XTOC alerts.
 - **Ground sensing or telemetry relay:** [Presence and MAVLink setup](Presence-and-MAVLink.md).
 - **Learn the packet format:** use the standalone Arduino examples below.
 
