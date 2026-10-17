@@ -1,10 +1,8 @@
 # Sentinel flight-controller link
 
-![Wraith carries Sentinel wired to its autopilot; a USB ground radio exchanges mission actions and telemetry with the aircraft over paired LoRa](../assets/presence/wraith-link-illustration.png)
+![Wraith Sentinel link](../assets/presence/wraith-link-illustration.png)
 
-*Concept illustration, not a tested installation or an application screenshot. Amber: mission actions. Cyan: position and status returning to XTOC. Pilot and video links remain separate.*
-
-## Paired flight-controller link
+*Wraith carrier illustration: mission requests travel to the aircraft; telemetry returns to XTOC. Pilot and video links remain separate.*
 
 Connect an aircraft flight controller through Sentinel to a USB ground node and XTOC:
 
@@ -46,7 +44,7 @@ Telemetry and autopilot acknowledgements return along the reverse path. When a s
 
 `peerNode` is the **aircraft** Meshtastic ID as a decimal integer: the example equals hex `10203040`. The portal's paired ID is the **ground** node. Channel indices are local and may differ between nodes. The helper reads the ground radio's configuration and requires a private channel before use; it never writes its keys, region or RF configuration.
 
-For control or mission reads, add the aircraft's `signingKeyHex` to the private link configuration. For control, set `trustedForControl: true`, allow the required `commands` (`hold`, `resume`, `rtl`), and enable `missionWrite` only when needed. Configure a scoped operator record using the existing XTOC Drones Bridge authority instructions. Enter the credential in XTOC, acquire control, review the exact aircraft and explicitly confirm each action. Missing signing, authority or fresh heartbeat blocks control. The example grants no control permission.
+For control or mission reads, add the aircraft's `signingKeyHex` to the private link configuration. For control, set `trustedForControl: true`, allow the required `commands` (`hold`, `resume`, `rtl`), and enable `missionWrite` only when needed. Configure a scoped operator record using the [XTOC Drones Bridge authority instructions](https://github.com/MKme/XTOC/blob/main/drones-bridge/README.md). Enter the credential in XTOC, acquire control, review the exact aircraft and explicitly confirm each action. Missing signing, authority or fresh heartbeat blocks control. The example grants no control permission.
 
 Mission upload requires a fresh disarmed aircraft; acceptance is followed by readback. A received ACK means acknowledgement, not proven movement. No command is automatically retried after a timeout or reconnect. Reconnect requires a fresh heartbeat and newly acquired control. Keep missions small enough for the existing 10-second per-step / 120-second overall transfer timeouts and 60-second operator lease; use the normal direct setup connection for larger transfers.
 
@@ -56,13 +54,8 @@ Optional `T=11` location reporting remains available using **Serial MAVLink** as
 
 Before use, bench-test with propulsion disabled: correct identities, signed heartbeat/position, Hold/Resume/RTL acknowledgements, mission readback, rejected wrong sender/channel, disconnected UART, loss of LoRa, expired authority, cold restart and recovery. Verify the controller's actual signature rejection and onboard failsafe behavior.
 
+![XTOC ground-node connection](../assets/presence/flight-ground.png)
 
-[Presence setup](Presence-and-MAVLink.md) · [Firmware reference](../firmware/SentinelPresenceMeshtastic/README.md)
+*Current XTOC interface with simulated aircraft telemetry and Sentinel import. Configure the bridge before acquiring flight-control authority.*
 
-![Boot setup entry screen](../assets/presence/setup-desktop.png)
-
-*Source-rendered setup with simulated settings. Configure during the boot portal window, then save.*
-
-![XTOC ground-node connection and aircraft telemetry](../assets/presence/flight-ground.png)
-
-*Current XTOC interface with simulated aircraft telemetry. A received Sentinel report is also shown in the sidebar.*
+[Wiring](Wiring-Reference.md) · [Troubleshooting](Deployment-and-Troubleshooting.md)

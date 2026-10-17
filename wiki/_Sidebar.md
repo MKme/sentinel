@@ -1,0 +1,16 @@
+# Sentinel
+
+- [Start here](Home.md)
+- [Wi-Fi detection](Wi-Fi-Detection.md)
+- [First node](Build-the-First-Node.md)
+- [Parts](Parts-and-Kits.md)
+- [Wiring](Wiring-Reference.md)
+- [Configuration](Configuration-Reference.md)
+- [MAVLink and locations](Presence-and-MAVLink.md)
+- [Flight-controller link](Flight-Controller-Link.md)
+- [Pi observations](Companion-Observations.md)
+- [XTOC / XCOM](XTOC-XCOM-Integration.md)
+- [Troubleshooting](Deployment-and-Troubleshooting.md)
+- [Packet reference](Packet-and-Firmware.md)
+- [Build and flash](Build-and-Flash.md)
+- [Standalone examples](Standalone-Examples.md)

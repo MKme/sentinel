@@ -1,46 +1,39 @@
-# Sentinel Wiki
+# Sentinel field guide
 
-## Choose your field role
+Sentinel turns a XIAO ESP32-S3 and Wio-SX1262 into a passive Wi-Fi activity detector and LoRa reporting node. Add motion sensing, MAVLink telemetry or observations from your own companion computer. Deploy it on the ground or carry it aboard Wraith XDRONE or another suitable platform.
 
-The XIAO Presence target now supports RCWL motion, Wi-Fi activity, a two-way MAVLink bridge and MAVLink-derived Sentinel location reports for ground nodes and carried payloads.
+## Choose your task
 
-[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+| Task | Guide | Result |
+| --- | --- | --- |
+| Detect nearby Wi-Fi activity | [Wi-Fi detection](Wi-Fi-Detection.md) | Readable mesh alert with label, RSSI and Wi-Fi channel |
+| Combine motion and Wi-Fi | [Build the first node](Build-the-First-Node.md) | Motion, Wi-Fi or combined alerts |
+| Return position to XTOC | [Presence and MAVLink](Presence-and-MAVLink.md) | Structured Sentinel T=11 location |
+| Exchange UART telemetry | [Presence and MAVLink](Presence-and-MAVLink.md) | Supported MAVLink frames over SMV1 |
+| Connect a flight controller | [Flight-controller link](Flight-Controller-Link.md) | Paired telemetry, supervised actions and missions |
+| Report a Pi classifier result | [Companion observations](Companion-Observations.md) | Class, confidence and fresh/stale/missing position |
+| Learn the packet format | [Standalone examples](Standalone-Examples.md) | Serial T=11 and a separate T=16 output-bank demo |
 
-Sentinel is an open-source field sensor for the MKME X Suite. XTOC and XCOM decode and display its reports, XINTEL provides local radio/SDR monitoring and packet ingest, and XCORE provides local AI-assisted analysis of XTOC/XCOM operational data. A node combines direct sensors, a controller, a transport, power, and an enclosure. Begin with one ESP32 and one PIR, prove a `T=11` packet end to end, then add only the sensing your mission requires.
+Wi-Fi detection needs no Pi, camera or classifier. Presence and the standalone examples are different programs with different wiring and transports. Choose firmware before assembling a node.
 
-![Wraith with an onboard Sentinel-to-autopilot connection, paired LoRa mission uplink and telemetry return to a USB-connected XTOC ground station](../assets/presence/wraith-link-illustration.png)
+## Build and operate
 
-*Concept illustration; component placement and map display are illustrative. Amber: mission actions. Cyan: returning telemetry. Separate pilot and video links.*
+1. Select [parts](Parts-and-Kits.md) and check [wiring](Wiring-Reference.md).
+2. [Build and flash](Build-and-Flash.md), then [configure the first node](Build-the-First-Node.md).
+3. Tune [Wi-Fi detection](Wi-Fi-Detection.md) using the [configuration reference](Configuration-Reference.md).
+4. Follow [XTOC/XCOM integration](XTOC-XCOM-Integration.md) for your report format.
+5. Complete [deployment checks](Deployment-and-Troubleshooting.md).
 
-- **Aircraft supervision:** [Flight-controller setup](Flight-Controller-Link.md) for signed commands, missions and returning telemetry.
-- **Companion classifier:** [Object observation setup](Companion-Observations.md) for USB input, GPS quality and XTOC alerts.
-- **Ground sensing or telemetry relay:** [Presence and MAVLink setup](Presence-and-MAVLink.md).
-- **Learn the packet format:** use the standalone Arduino examples below.
+![Sentinel setup portal](../assets/presence/setup-desktop.png)
 
-## Standalone sensor examples
+*Firmware-rendered setup with example values and simulated channel state. Save, then verify reception at a second radio.*
 
-1. [Parts and kits](Parts-and-Kits.md)
-2. [Build the first node](Build-the-First-Node.md)
-3. [Wiring reference](Wiring-Reference.md)
-4. [XTOC/XCOM integration](XTOC-XCOM-Integration.md)
-5. [Deployment and troubleshooting](Deployment-and-Troubleshooting.md)
-6. [Packet and firmware notes](Packet-and-Firmware.md)
+## References
 
-## X Suite projects
+- [Packet and firmware reference](Packet-and-Firmware.md)
+- [Firmware source](../firmware/SentinelPresenceMeshtastic/README.md)
+- [Training Hub](https://store.mkme.org/training/): Disaster Operations, MILSIM Operations, technical specifications, flight-link and companion-observation HTML/PDF guides
+- [Sentinel project](https://store.mkme.org/sentinel/)
+- [XDRONE featuring Wraith](https://store.mkme.org/xdrone/)
 
-- [XTOC](https://github.com/MKme/XTOC) — command map, Sentinel review, triggers, and control composition
-- [XCOM](https://github.com/MKme/xcom) — field packet composition, reception, mapping, and transport handoff
-- [XINTEL](https://github.com/MKme/xintel) — local radio/SDR monitoring, transcription, and packet ingest
-- [XCORE](https://github.com/MKme/xcore) — local AI-assisted summaries and operational analysis
-- [XCAM](https://github.com/MKme/xcam) — local camera feeds and optional camera-motion Sentinel reports
-- [XNODE](https://github.com/MKme/xnode) — wearable and keyboard field endpoints
-
-![Sentinel field node](sentinel-hero.png)
-
-![Sentinel assembly](sentinel-assembly.png)
-
-Sentinel is not a certified life-safety or security system. Keep a human verification and fallback process.
-
-## Direct aircraft supervision
-
-Use the [paired flight-controller link](Flight-Controller-Link.md) for XTOC commands and returning telemetry through a USB ground node. This is separately enabled from the legacy telemetry bridge and T=11 position reporting.
+Enter your email once in the Training Hub to unlock its library in that browser.

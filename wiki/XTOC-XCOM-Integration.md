@@ -1,31 +1,42 @@
-# XTOC and XCOM Integration
+# XTOC and XCOM integration
 
-## Presence firmware update
+## Match the receiver to the report
 
-XTOC connected-mesh auto-import can ingest the converted X1.11.C reports through its existing Sentinel decoder. Enable incoming auto-import and verify the displayed label/location. WRAITH-01 is a platform label; T=11 has no drone classification field. Live hardware import remains a bench acceptance step.
+| Report | Where to look |
+| --- | --- |
+| Presence Wi-Fi/motion text | Receiving mesh messages; not Sentinel T=11 |
+| T=11 location/sensor report | XTOC Sentinel after import |
+| T=11 companion observation | Updated XTOC Sentinel, including quality fields |
+| SMV1 MAVLink | Matching bridge UART consumer |
+| SMF1 flight traffic | XTOC Drones through the Drones Bridge |
 
-[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+## Import and inspect T=11
 
-## Import a report
+1. For a manual test, copy the entire `X1.11.C...` packet into **Comms → Import/Export**, paste and import. The standalone sketch prints one packet per line.
+2. For radio operation, connect the receiving mesh using the app's mesh controls and enable incoming packet auto-import. A shared flight-ground USB connection needs Drones Bridge `sentinelReports` and `sentinelChannel`; do not open two USB clients.
+3. In XTOC open **Sentinel**, select the report and check node ID, label, timestamp, readings and location quality.
+4. Enable the **Sentinel** Tactical Map layer. NO GPS is not zero latitude/longitude and must not create a map point.
 
-1. Copy the complete packet printed by the node.
-2. Open `Comms -> Import/Export` in XTOC or XCOM.
-3. Paste and import.
-4. Review it on the Sentinel page.
-5. Enable the Sentinel Tactical Map layer.
+XCOM supports Sentinel reception, decoding and map workflows. Use an updated receiver that understands observation quality flags. XTOC provides the observation review and SOA workflow below. A label such as WRAITH-01 identifies your platform by convention; T=11 has no drone/entity-type field.
 
-## Create useful triggers
+![XTOC Sentinel with no GPS](../assets/presence/observation-no-gps.png)
 
-- motion: filter the exact node label and choose type 1 or 2
-- temperature: use type 6 with a threshold and re-arm interval
-- battery: use type 7 with a conservative millivolt threshold
-- contact: assign a documented `inMask` bit
-- silence: use a heartbeat/report expectation and a separate no-report process
+*Current XTOC with simulated observations. Missing position is explicit.*
 
-## CONTROL
+## Configure observation alerts
 
-Compose `T=16 CONTROL` only for engineered low-voltage outputs. Target the exact node ID, prefer `SET`/`CLEAR` over ambiguous toggles, request acknowledgement, and confirm the resulting `outMask` report.
+Acquire **Sentinel Object Observation Alerts** in XTOC **XPASS**. In **Triggers**, search **SOA** and edit the fire, smoke, custom-object, stale-GPS or no-GPS rule. Set source, class, confidence and GPS filters, enable and save. Templates and two local plugin examples start disabled. Initial acquisition needs online authorization; installed authorized content continues offline.
 
-## Direct aircraft supervision
+![SOA trigger settings](../assets/presence/observation-trigger.png)
 
-Use the [paired flight-controller link](Flight-Controller-Link.md) for XTOC commands and returning telemetry through a USB ground node. This is separately enabled from the legacy telemetry bridge and T=11 position reporting.
+*Example filters. Configure, enable and save the intended rule.*
+
+Submit a new matching observation after cooldown and verify the alert and Sentinel details. Test a nonmatching class too. Coordinates locate the observing sensor, not the detected object.
+
+## Other sensors and control
+
+For custom T=11 rules use exact label and sensor convention: RCWL type 1, PIR type 2, temperature type 6 in tenths °C, battery type 7 in mV. Assign contact bits in `inMask` consistently. Keep a separate expected-report/silence process.
+
+Standalone **T=16 CONTROL** is for engineered low-voltage output banks. Target the correct node and verify returned `outMask`. It does not make Presence a T=16 actuator. For aircraft use [Flight-controller link](Flight-Controller-Link.md).
+
+XINTEL provides local radio/SDR monitoring and packet ingest; XCORE provides local AI-assisted analysis of XTOC/XCOM data. Neither replaces the radio/import setup above.

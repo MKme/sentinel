@@ -1,26 +1,41 @@
-# Wiring Reference
+# Wiring reference
 
-## Presence firmware update
+## XIAO ESP32-S3 + Wio-SX1262 Presence
 
-Presence UART: D7/GPIO44 RX connects to source TX; D6/GPIO43 TX connects to consumer RX; share GND and use 3.3 V TTL. USB diagnostics use 115200 baud. RCWL uses GPIO3 (alternate GPIO4).
-
-[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
-
-## Direct input pattern
-
-| Function | ESP32 example | Notes |
+| Function | Header / GPIO | Connect to |
 | --- | --- | --- |
-| PIR/RCWL output | GPIO 4 | verify the module output is safe for 3.3 V logic |
-| reed contact | GPIO 18 to contact, other contact to GND | configure `INPUT_PULLUP`; closed normally reads low |
-| DS18B20 data | GPIO 19 | normally requires a 4.7 kΩ pull-up from data to 3.3 V |
-| battery ADC | GPIO 34 through calculated divider | never apply battery voltage directly above the ADC rating |
+| Motion | D2 / GPIO3 default | RCWL OUT |
+| Alternate motion | D3 / GPIO4, portal-selectable | RCWL OUT instead of D2 |
+| Sensor power | Suitable 5 V supply | RCWL VIN |
+| Signal reference | GND | Sensor/controller signal ground |
+| MAVLink receive | D7 / GPIO44 / UART RX | Source/controller TX |
+| MAVLink transmit | D6 / GPIO43 / UART TX | Consumer/controller RX |
+| Companion | USB data | Pi/computer USB host |
 
-All modules must share ground unless a professionally designed isolated interface is required. Confirm the exact board pinout; GPIO behavior differs across ESP32 families.
+Use **3.3 V TTL**, not RS-232 or 5 V logic. UART is 8N1 at 9600, 19200, 38400, **57600 default**, or 115200. USB diagnostics/API use 115200 independently. Connect only the UART directions needed.
 
-## Output warning
+GPIO5/6 are reserved for I²C; GPIO7/8/9 and 38–42 serve the radio. GPIO43/44 carry telemetry. Upstream GPS and generic Serial modules are disabled on this target to prevent conflicts. Header D2 is not GPIO2.
 
-GPIO pins cannot drive coils, lamps, motors, or relays directly. The control demo is logic-level reference code. Use a suitable low-voltage driver, flyback protection for inductive loads, fuse, safe default state, and acknowledgement. Never use this project to switch mains or hazardous loads.
+Check labels and orientation with power disconnected. Fit the correct antenna before transmitting and secure wiring.
 
-## Direct aircraft supervision
+## Pi plus flight controller
 
-Use the [paired flight-controller link](Flight-Controller-Link.md) for XTOC commands and returning telemetry through a USB ground node. This is separately enabled from the legacy telemetry bridge and T=11 position reporting.
+```text
+Pi USB host/data ------- USB cable -------- Sentinel USB
+Controller TX ---------------------------- Sentinel RX D7 / GPIO44
+Controller RX ---------------------------- Sentinel TX D6 / GPIO43
+Controller GND --------------------------- Sentinel GND
+Sentinel radio -------- LoRa ------------- Ground radio -- USB -- PC
+```
+
+The Pi submits SOI1 through the local Meshtastic API; the UART carries MAVLink. Never tie two TX outputs together. Use one USB client per radio; close Serial Monitor before starting the companion or bridge.
+
+![Aircraft pairing and UART controls](../assets/presence/flight-link.png)
+
+*Firmware-rendered settings with simulated values. Wiring alone does not enable forwarding.*
+
+## Standalone examples
+
+The separate sketch uses GPIO4 and RCWL type 1. For PIR, change the sensor convention to type 2 and check its electrical requirements. Custom DevKit contacts, temperature and ADC circuits need their own code; they are not Presence assignments.
+
+GPIOs cannot drive coils or motors directly. The standalone output demo needs engineered low-voltage drivers, protection, fusing and safe defaults. It is unrelated to MAVLink flight control.

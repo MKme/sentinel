@@ -199,6 +199,11 @@ Do not charge loose lithium cells with improvised wiring. Use protected cells, a
 - [Online illustrated setup guide](https://www.mkme.org/xtoc/guides/sentinel-flight-link.html) · [Printable PDF](https://www.mkme.org/xtoc/guides/sentinel-flight-link.pdf)
 
 - [Wiki home](wiki/Home.md)
+- [Passive Wi-Fi detection](wiki/Wi-Fi-Detection.md)
+- [Configuration defaults and ranges](wiki/Configuration-Reference.md)
+- [Build and flash Presence firmware](wiki/Build-and-Flash.md)
+- [Companion observations and SOI1 input](wiki/Companion-Observations.md)
+- [Standalone Arduino examples](wiki/Standalone-Examples.md)
 - [Parts and kits](https://github.com/MKme/sentinel/blob/main/wiki/Parts-and-Kits.md)
 - [Build the first node](https://github.com/MKme/sentinel/blob/main/wiki/Build-the-First-Node.md)
 - [Wiring reference](https://github.com/MKme/sentinel/blob/main/wiki/Wiring-Reference.md)
@@ -206,7 +211,7 @@ Do not charge loose lithium cells with improvised wiring. Use protected cells, a
 - [Deployment and troubleshooting](https://github.com/MKme/sentinel/blob/main/wiki/Deployment-and-Troubleshooting.md)
 - [Packet and firmware notes](https://github.com/MKme/sentinel/blob/main/wiki/Packet-and-Firmware.md)
 
-Current source-controlled [wiki files](wiki/Home.md), including the [Presence and MAVLink guide](wiki/Presence-and-MAVLink.md), are maintained here. These source-controlled pages are the maintained wiki documentation.
+The source-controlled [wiki pages](wiki/Home.md) include the [Presence and MAVLink guide](wiki/Presence-and-MAVLink.md). Maintainers can synchronize them into an existing GitHub wiki checkout with `python tools/sync_wiki.py --target <wiki-checkout>` and verify parity with `--check`. Inspect both working trees first. The command adapts page/source/image links and copies referenced images; it does not delete files, commit or publish.
 
 ## Safe deployment checklist
 
@@ -222,10 +227,10 @@ Current source-controlled [wiki files](wiki/Home.md), including the [Presence an
 
 Sentinel reports are decoded by XTOC and XCOM. XTOC provides the Sentinel review page, Tactical Map layer, time-based triggers, label filters, temperature/battery thresholds, input/output-mask triggers, and `T=16 CONTROL` composition. XINTEL supplies local radio/SDR monitoring and packet ingest, while XCORE provides local AI-assisted analysis of XTOC/XCOM operational data.
 
-- [XTOC](https://github.com/MKme/XTOC)
-- [XCOM](https://github.com/MKme/xcom)
-- [XINTEL](https://github.com/MKme/xintel) provides local radio/SDR monitoring, transcription, and packet ingest
-- [XCORE](https://github.com/MKme/xcore) provides local AI-assisted summaries and operational analysis
+- [XTOC](https://store.mkme.org/product/xtoc/)
+- [XCOM](https://store.mkme.org/product/xcom-offline-radio-communication-suite/)
+- [XINTEL](https://store.mkme.org/product/xintel/) provides local radio/SDR monitoring, transcription, and packet ingest
+- [XCORE](https://store.mkme.org/product/xcore/) provides local AI-assisted summaries and operational analysis
 - [XCAM](https://github.com/MKme/xcam) can also post camera-motion Sentinel reports
 - [XNODE](https://github.com/MKme/xnode) provides wearable and keyboard field endpoints
 

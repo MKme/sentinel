@@ -1,25 +1,34 @@
-# Parts and Kits
+# Parts and kits
 
-## Presence firmware update
+## Presence node
 
-The Presence build uses XIAO ESP32-S3 with the matching Wio-SX1262 B2B assembly, RCWL-0516, suitable regulated power and antenna. MAVLink requires a compatible 3.3 V TTL telemetry source; no additional GPS driver is supplied.
+| Part | Purpose / selection |
+| --- | --- |
+| XIAO ESP32-S3 | Controller and passive Wi-Fi receiver |
+| Wio-SX1262 B2B for XIAO | Match this exact radio assembly/pin mapping |
+| Correct-band LoRa antenna | Fit before transmitting; match radio and region |
+| USB data cable and regulated supply | Setup, diagnostics/API and continuous reception |
+| Second compatible Meshtastic node | Verify actual radio reception |
+| Optional RCWL-0516 | Stationary motion cue; OUT to D2/GPIO3 by default |
+| Enclosure, connectors and strain relief | Protect the board and wiring |
 
-[Presence, MAVLink and Sentinel location setup](Presence-and-MAVLink.md) includes current setup screenshots and validation steps.
+Wi-Fi detection needs no external sensor. Keep a disconnected motion input stable and verify its idle state before interpreting motion events.
 
-## One-node starter
+## Add the needed interface
 
-- ESP32 DevKit V1
-- HC-SR501 PIR
-- USB data cable
-- breadboard and jumpers for bench testing
-- 5 V USB supply or power bank
+| Role | Add |
+| --- | --- |
+| Telemetry/location | 3.3 V TTL MAVLink source and common ground |
+| Paired flight link | MAVLink controller with signing, USB ground radio and XTOC Drones Bridge |
+| Companion observations | Your Pi/computer, USB host connection and classifier |
+| Pi Zero | Host adapter on the data/OTG port, not its power-only socket |
 
-Affiliate-tagged Amazon searches: [ESP32](https://www.amazon.com/s?k=ESP32+DevKit+V1&tag=wbca-20), [PIR](https://www.amazon.com/s?k=HC-SR501+PIR+motion+sensor&tag=wbca-20), [breadboard kit](https://www.amazon.com/s?k=electronics+breadboard+jumper+wire+kit&tag=wbca-20).
+Pi and flight controller use separate interfaces. Never join their TX outputs. Plan power to avoid backfeeding supplies.
 
-## Multi-sensor node
+## Standalone learning kit
 
-Add a [wired magnetic contact](https://www.amazon.com/s?k=magnetic+reed+contact+switch+wired&tag=wbca-20), [waterproof DS18B20](https://www.amazon.com/s?k=waterproof+DS18B20+temperature+sensor&tag=wbca-20), suitable battery measurement wiring, [enclosure](https://www.amazon.com/s?k=waterproof+electrical+project+enclosure&tag=wbca-20), [cable glands](https://www.amazon.com/s?k=waterproof+cable+glands+assortment&tag=wbca-20), fuse, standoffs, heat shrink, and labels.
+The [Arduino demos](Standalone-Examples.md) use an ESP32 DevKit and motion sensor. They print packets and are not the Presence mesh firmware. Contacts, temperature probes and battery ADC circuits are custom extensions, not automatically enabled Presence inputs.
 
-## Spares
+Carry a programmed spare of the same variant, data cable, antenna, connectors, fuse and known-good supply. Use protected, chemistry-compatible power. Measure consumption during radio activity: Presence is a continuous receiver, not a sleeping sensor.
 
-Carry one programmed controller, one sensor of each standardized type, fuses, cables, glands, connectors, and a known-good power source. Standardize first; exotic variation makes field repair harder.
+Next: [Wiring](Wiring-Reference.md) and [first-node setup](Build-the-First-Node.md).
