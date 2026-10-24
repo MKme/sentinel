@@ -1,18 +1,18 @@
 # Companion observation input
 
-Send a small classifier result from your own Pi or other computer to Sentinel. The ESP adds available MAVLink sensor position and transmits an ordinary T=11 Sentinel alert. Implement your own camera/model; the supplied example only encodes and submits observations.
+Send a small classifier result from your own Pi or other computer to Sentinel. The ESP transmits an ordinary T=11 Sentinel alert. Implement your own camera/model; the supplied example only encodes and submits observations.
 
 ## Wiring and setup
 
-Connect the companion USB host to the ESP's USB data connection. On Pi Zero use its USB data/OTG port with a host adapter, not the power-only port. Provide a suitable regulated supply. Leave the flight controller on RX GPIO44 / TX GPIO43 with matching baud and common ground; never tie two devices' TX outputs together.
+Connect the companion USB host to the ESP's USB data connection. On Pi Zero use its USB data/OTG port with a host adapter, not the power-only port. Provide a suitable regulated supply.
 
-In the Sentinel boot portal enable **Accept local companion observations (SOI1)**, mesh output and a configured private mesh channel. Observation interval / repeated-label cooldown defaults to 15 seconds (5–3600). Input is off by default and stored separately from existing flight settings. Use **Serial MAVLink** for sensor positioning, or the enabled aircraft link's controller identity. No telemetry is required to submit an observation.
+In the Sentinel boot portal enable **Accept local companion observations (SOI1)**, mesh output and a configured private mesh channel. Observation interval / repeated-label cooldown defaults to 15 seconds (5–3600). Input is off by default and saved in flash. No position source is required.
 
 ![Companion input controls in Sentinel setup](../../assets/presence/companion-setup.png)
 
 *Actual firmware setup with simulated settings. Enable local input and private mesh output.*
 
-USB retains the Meshtastic API. Local client API access is the trust boundary: protect USB access and any enabled local BLE/network client access. The hook consumes SOI submissions before routing; remote LoRa/MQTT packets cannot invoke it. Raw serial text is not accepted. The input never carries flight commands.
+USB retains the Meshtastic API. Local client API access is the trust boundary: protect USB access and any enabled local BLE/network client access. The hook consumes SOI submissions before routing; remote LoRa/MQTT packets cannot invoke it. Raw serial text is not accepted. The input accepts observations only.
 
 ## Input contract: SOI1
 
@@ -36,13 +36,11 @@ The generic [sender example](examples/send_observation.py) uses the Meshtastic P
 python send_observation.py --port /dev/ttyACM0 --label FIRE --confidence 92 --count 1
 ```
 
-Use the device path assigned to your ESP; some USB adapters use `/dev/ttyUSB0`. Run only one client on that port. An observation ID is deduplicated for 60 seconds while retained in the 16-entry recent cache; same-label cooldown follows the configured interval. The four-entry pending queue drops overflow and expires reports after 30 seconds. Flight requests/responses are serviced first, and observations wait at least 250 ms after a flight downlink. This is bounded best-effort reporting, not guaranteed delivery or a radio airtime reservation.
+Use the device path assigned to your ESP; some USB adapters use `/dev/ttyUSB0`. Run only one client on that port. An observation ID is deduplicated for 60 seconds while retained in the 16-entry recent cache; same-label cooldown follows the configured interval. The four-entry pending queue drops overflow and expires reports after 30 seconds. This is bounded best-effort reporting, not guaranteed delivery or a radio airtime reservation.
 
-## Position and clock
+## Location and clock
 
-Sentinel snapshots the latest usable controller position when it accepts input. It does not interpolate a historical camera location. The source age records the classifier-to-input delay. A fix under 15 seconds old is fresh; otherwise the last valid fix is stale. A bad GPS fix removes the usable position. With no fix, the report explicitly has no location. The node's UTC clock, or recent controller UTC, supplies observation time; without UTC, time is marked unknown and the report still sends. GPS acquisition and UTC validity are separate.
-
-Position is **sensor origin**, not detected-object geolocation. Neither zero coordinates nor a fabricated epoch substitute for missing data. Queue delay increments transmitted fix/observation age and can downgrade a fresh snapshot to stale. Ages saturate at 32767 seconds; treat that value as at least that age.
+Local companion reports explicitly mark location unavailable, with INT32_MIN coordinates and GPS age -1. The node's UTC clock supplies observation time when valid; otherwise time is marked unknown. Queue delay increments observation age. No coordinates or epoch are invented.
 
 ## Mesh output: existing Sentinel v1 / T=11
 
@@ -61,7 +59,7 @@ Six sensor readings carry observation metadata (existing one-byte type + signed 
 | 244 | Observation ID high 16 bits, interpreted unsigned |
 | 245 | Observation ID low 16 bits, interpreted unsigned |
 
-Use the updated XTOC Sentinel view and mesh auto-import. A shared XTOC Drones Bridge ground connection can carry these packets with `sentinelReports` enabled. XTOC XPASS **Sentinel Object Observation Alerts** installs five disabled SOA trigger templates and two disabled local plugin examples. Configure source, class, confidence and GPS filters in Triggers, enable and save. A source filter is not independent proof of identity. Review observations before consequential actions.
+Use the updated XTOC Sentinel view and mesh auto-import. XTOC XPASS **Sentinel Object Observation Alerts** installs five disabled SOA trigger templates and two disabled local plugin examples. Configure source, class, confidence and GPS filters in Triggers, enable and save. A source filter is not independent proof of identity. Review observations before consequential actions.
 
 Diagnostic heartbeat counters report accepted, rejected, duplicate, dropped, sent and queued observations. “Sent” means submitted to the mesh stack, not received by the ground operator. Camera video remains on its separate link or local storage.
 

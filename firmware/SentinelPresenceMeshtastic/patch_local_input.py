@@ -1,6 +1,6 @@
 """Install the reviewed local ingress hook in disposable pinned build staging only."""
 from pathlib import Path
-root = Path(__file__).resolve().parent / '.build/meshtastic'
+root = Path(__file__).resolve().parent / '.build-ground/meshtastic'
 p = root / 'src/mesh/MeshService.cpp'
 s = p.read_text()
 marker = '// Sentinel companion input: consume before any RF routing.'

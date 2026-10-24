@@ -4,3 +4,7 @@
 *.elf
 *.map
 *.log
+
+# Historical aircraft publication evidence is retained in private Sentinel Air.
+/site/sentinel/publication.json
+/site/sentinel/screenshots/

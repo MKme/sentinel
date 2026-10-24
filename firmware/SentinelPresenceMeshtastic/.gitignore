@@ -1,3 +1,6 @@
 .build/
 artifacts/
 __pycache__/
+
+.build-ground/
+artifacts-ground/

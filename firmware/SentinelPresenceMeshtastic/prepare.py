@@ -12,7 +12,7 @@ p.add_argument('--source', type=pathlib.Path, default=pathlib.Path('C:/GitHub/li
 p.add_argument('--platform', type=pathlib.Path, default=pathlib.Path.home()/'.platformio/platforms/espressif32@6.9.0')
 a = p.parse_args()
 source = a.source.resolve()
-dest = HERE/'.build/meshtastic'
+dest = HERE/'.build-ground/meshtastic'
 if subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip() != REF:
     raise SystemExit('Local Meshtastic revision differs from the supported pin')
 libs = source/'.pio/libdeps/t-watch-s3'
@@ -61,10 +61,10 @@ text=script.read_text()
 start=text.index('# IntelHex workaround');end=text.index('import esptool',start)
 script.write_text(text[:start]+text[end:])
 version=dest/'bin/readprops.py'
-version.write_text(version.read_text().replace('suffix = sha','suffix = "sentinel1"'))
+version.write_text(version.read_text().replace('suffix = sha','suffix = "sentinel-ground1"'))
 with (dest/'platformio.ini').open('a') as f:
     f.write('''
-[env:sentinel-xiao-s3]
+[env:sentinel-ground-xiao-s3]
 extends = env:seeed-xiao-s3
 platform = PLATFORM
 platform_packages =

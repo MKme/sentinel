@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
-struct SentinelSettingsV3 {
+struct SentinelSettings {
     char label[25];
     uint8_t motionGpio;
     int8_t rssiMin;
@@ -21,24 +21,6 @@ struct SentinelSettingsV3 {
     bool meshHeartbeat;
 };
 
-struct SentinelSettingsV4 : SentinelSettingsV3 {
-    bool mavSerialToMesh=false, mavMeshToSerial=false;
-    uint8_t mavChannel=0;
-    uint32_t mavBaud=57600;
-    uint16_t mavIntervalMs=5000;
-};
-struct SentinelSettingsV5 : SentinelSettingsV4 {
-    uint8_t sentinelSource=0, sentinelSystem=1, sentinelComponent=1;
-    uint32_t sentinelPeer=0;
-    uint16_t sentinelIntervalSeconds=15;
-};
-struct SentinelSettings : SentinelSettingsV5 {
-    bool flightEnabled=false;
-    uint32_t flightPeer=0;
-    uint8_t flightChannel=0, flightSystem=1, flightComponent=1;
-    uint16_t flightIntervalMs=1000;
-};
-inline bool validMavBaud(uint32_t n) { return n==9600 || n==19200 || n==38400 || n==57600 || n==115200; }
 inline bool validSettings(const SentinelSettings &s) {
     if (!s.label[0] || s.label[24] != 0) return false;
     for (unsigned i=0;s.label[i];++i) {
@@ -53,11 +35,7 @@ inline bool validSettings(const SentinelSettings &s) {
         s.motionCooldownSeconds>=2 && s.motionCooldownSeconds<=3600 &&
         s.combinedWindowSeconds>=1 && s.combinedWindowSeconds<=300 &&
         s.heartbeatSeconds>=10 && s.heartbeatSeconds<=3600 &&
-        s.portalSeconds>=15 && s.portalSeconds<=600 && s.meshChannelIndex<8 && s.mavChannel<8 && validMavBaud(s.mavBaud) &&
-        s.mavIntervalMs>=1000 && s.mavIntervalMs<=60000 && s.sentinelSource<=2 && s.sentinelSystem>0 && s.sentinelComponent>0 &&
-        (s.sentinelSource!=2 || s.sentinelPeer!=0) && s.sentinelIntervalSeconds>=5 && s.sentinelIntervalSeconds<=3600 && s.flightChannel<8 && s.flightSystem>0 && s.flightComponent>0 &&
-        s.flightIntervalMs>=250 && s.flightIntervalMs<=2000 && (!s.flightEnabled ||
-        (s.flightPeer!=0 && s.flightPeer!=UINT32_MAX && !s.mavSerialToMesh && !s.mavMeshToSerial));
+        s.portalSeconds>=15 && s.portalSeconds<=600 && s.meshChannelIndex<8;
 }
 inline bool publicKey(const uint8_t *key, int length) {
     const uint8_t prefix[15]={0xd4,0xf1,0xbb,0x3a,0x20,0x29,0x07,0x59,0xf0,0xbc,0xff,0xab,0xcf,0x4e,0x69};

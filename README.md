@@ -1,22 +1,20 @@
 # Sentinel
 
-![Sentinel remote sensing, mesh telemetry and field relay with Wraith XDRONE carrier concept](assets/presence/sentinel-field-header.png)
+![Sentinel standalone sensor assembly](assets/sentinel-assembly.png)
 
-**Remote sensing. Mesh telemetry. Field relay.** Sentinel is the remote-sensing branch of the XNODE field-device concept, maintained in this repository for the MKME X Suite. Deploy a stationary sensor node or integrate a compact sensing and communications payload into an aircraft such as **Wraith XDRONE**.
+**Local sensing. Mesh alerts. Field relay.** Sentinel is a standalone ground-sensor project for the MKME X Suite. Use it at a gate, equipment site or stationary observation point, without internet access.
 
-The **XIAO ESP32-S3 + Wio-SX1262** firmware combines RCWL-0516 motion sensing, passive Wi-Fi activity detection, USB diagnostics, selectable Meshtastic reports and two selectable MAVLink modes: a low-rate telemetry bridge or a paired flight-controller link. Standard Meshtastic forwarding provides the relay function according to the configured device role, hop limit and radio settings.
+The XIAO ESP32-S3 + Wio-SX1262 firmware combines RCWL-0516 motion sensing, passive Wi-Fi activity detection, USB diagnostics and selectable Meshtastic alerts. Standard Meshtastic forwarding follows the radio's configured role, hop limit and channel settings.
 
-The original Arduino examples remain available for direct `T=11 SENTINEL` import into XTOC and XCOM. The Presence firmware sends **Meshtastic sensor alerts, optional status messages and optional MAVLink-derived `T=11` location reports** for XTOC ingestion.
-
-Repository: <https://github.com/MKme/sentinel>
+The Arduino examples provide direct `T=11 SENTINEL` import into XTOC and XCOM. Presence firmware provides readable sensor alerts and optional companion `T=11` observations.
 
 ## Companion object observations
 
-Connect your own Raspberry Pi classifier over USB. Sentinel accepts a compact object label, confidence, count and observation ID, attaches the available MAVLink sensor position, and sends a normal `T=11` alert over the private mesh. Missing GPS still produces a report; old fixes are marked stale. Coordinates describe the observing sensor, not the detected object's position. Images and recognition software stay on your companion computer.
+Connect your own Raspberry Pi classifier over USB. Sentinel accepts a compact object label, confidence, count and observation ID, then sends a normal `T=11` alert over the private mesh. Companion reports explicitly mark location unavailable; missing UTC is marked unknown. Images and recognition software stay on your companion computer.
 
 Start with the [companion input contract and generic sender](firmware/SentinelPresenceMeshtastic/OBSERVATIONS.md) or the [wiki setup](wiki/Companion-Observations.md). In XTOC, install **Sentinel Object Observation Alerts** from XPASS, then configure and enable the **SOA** templates in **Triggers**. The example plugins and rules start disabled. Use an updated XTOC receiver supporting observation quality fields.
 
-> Sentinel is an awareness aid, not a certified alarm, security, fire, medical, or life-safety system. Do not wire sensor outputs to mains, machinery, vehicle controls or hazardous loads. Aircraft supervision uses the explicitly configured paired MAVLink interface described below.
+> Sentinel is an awareness aid, not a certified alarm, security, fire, medical, or life-safety system. Do not wire sensor outputs to mains, machinery, vehicle controls or hazardous loads.
 
 ## Field roles
 
@@ -24,10 +22,9 @@ Start with the [companion input contract and generic sender](firmware/SentinelPr
 | --- | --- |
 | Ground sensing station | Monitor a gate, equipment site or stationary observation point for motion and nearby Wi-Fi activity. |
 | Mesh relay | Participate in the configured Meshtastic network and forward eligible packets. Antenna placement, terrain, role and channel settings determine coverage. |
-| Wraith sensing payload | Carry the small node as a separate payload; use its mesh link for sensor reports while retaining an independent flight-control system. |
 | Bench diagnostics | Inspect activity, signal strength, Wi-Fi channel, motion transitions, queue drops and scanner status over USB at 115200 baud. |
 
-Wi-Fi activity is a radio observation, not a person count or device identity. RCWL motion sensing is intended for a stationary or landed installation; movement of the aircraft changes the sensor's reference and can produce motion indications.
+Wi-Fi activity is a radio observation, not a person count or device identity. RCWL motion sensing needs a stationary installation; moving the sensor can produce motion indications.
 
 ## Configure the Presence node
 
@@ -63,30 +60,6 @@ SENTINEL-04: ONLINE WIFI 12 MOTION 0 SCAN OK
 
 **[Presence firmware, wiring and local build](firmware/SentinelPresenceMeshtastic/README.md)**
 
-## MAVLink telemetry over mesh
-
-Enable **Serial RX to mesh**, **Mesh to serial TX**, or both in the boot portal. The bridge uses a separate 3.3 V UART: **D7/GPIO44 RX**, **D6/GPIO43 TX**, common **GND**. Cross TX to RX at the connected device; USB remains the diagnostic console. Set the UART baud to match your telemetry device (default **57600**, 8N1).
-
-![MAVLink bridge setup with independent forwarding switches, UART baud, mesh channel and send interval](assets/presence/mavlink-bridge.png)
-
-*Source-rendered setup controls with simulated settings. Both directions default off. [Full-size bridge controls](assets/presence/mavlink-bridge.png).*
-
-On the aircraft or sensor side, enable serial RX to mesh. On the receiving side, enable mesh to serial TX and connect the UART to your telemetry display or a suitable USB-UART adapter. Use the same configured private Meshtastic channel/key on both nodes and select its local channel index on each. Configure keys and RF settings through Meshtastic Bluetooth. A public/default-key channel is blocked for MAVLink regardless of the sensor-alert opt-in.
-
-Supported MAVLink 1/2 telemetry: **HEARTBEAT, SYS_STATUS, GPS_RAW_INT, ATTITUDE and GLOBAL_POSITION_INT**. Checksums are validated; accepted frames, including MAVLink 2 signature bytes, are forwarded unchanged. Signature authentication remains the receiving MAVLink endpoint's responsibility. Flight commands, parameter/mission transfers and other message types are excluded.
-
-The bridge sends at most one frame per configured interval (**5 seconds** by default), rotating among the latest observations of each supported type. This is low-rate situational telemetry, not a full-rate flight link. Both endpoints need this bridge firmware; ordinary Meshtastic text messages are not decoded as MAVLink. See [wiring, message format and bench checks](firmware/SentinelPresenceMeshtastic/README.md#mavlink-serial--mesh-bridge).
-
-## Wraith / XDRONE payload integration
-
-![Wraith XDRONE internal CAD layout for planning a separate sensing and communications payload](assets/presence/wraith-internal.png)
-
-*Wraith development CAD. The image shows the aircraft architecture, not a fitted Sentinel installation.*
-
-Treat Sentinel as a separately powered and secured sensing/communications payload. Plan a suitable regulated supply, antenna clearance, access to USB and the setup window, strain relief and a mount that preserves aircraft balance and cooling. Keep the node and wiring clear of the EDF, servos and flight-control connections. Verify interference and sensing behavior with the propulsion system operating before an airborne installation.
-
-The legacy SMV1 telemetry bridge forwards supported telemetry only. Select the separate paired SMF1 flight-controller mode for signed XTOC Hold/Resume/RTL and mission transfer through a USB ground node. Aircraft payload fit and flight acceptance are separate from the sensing code. [Full aircraft CAD view](assets/presence/wraith-cad.png).
-
 ## What you can build
 
 - gate, door, cabinet, or equipment-case contact node
@@ -116,28 +89,6 @@ Start with an ESP32 DevKit and one HC-SR501 PIR. The supplied sketch needs no th
 6. In XTOC or XCOM, open `Comms -> Import/Export`, paste the complete line, and import it.
 7. Confirm the report appears in `Sentinel` and on the Tactical Map Sentinel layer.
 8. Walk-test the PIR, then test stillness, sunlight changes, warm-up, and the planned mounting position.
-
-## USB ground station and flight-controller link
-
-![Wraith carries Sentinel connected to its autopilot by MAVLink; a USB ground radio sends mission actions over LoRa and returns position, battery and heartbeat to the XTOC map](assets/presence/wraith-link-illustration.png)
-
-*Concept illustration: onboard placement, electronics and map display are illustrative. Amber shows mission actions; cyan shows returning telemetry. Pilot and video links remain separate.*
-
-**Build with familiar parts:** a compatible Meshtastic USB ground radio, XIAO ESP32-S3 + Wio-SX1262 aircraft node and the autopilot's MAVLink UART. No cellular service or cloud relay is needed for this local path. LoRa carries compact commands and telemetry; the autopilot handles stabilization and flight execution. The paired flight path is direct, not a multi-hop command mesh.
-
-A USB-connected ground node can carry XTOC supervised commands over LoRa to an aircraft Sentinel and return its MAVLink telemetry. The separate paired flight mode supports Hold/Resume/RTL and mission transfer with existing XTOC operator authorization and end-to-end MAVLink signing.
-
-![Aircraft flight-controller link configuration](assets/presence/flight-link.png)
-
-*Source-rendered settings, disabled by default. [Ground station, wiring and control setup](wiki/Flight-Controller-Link.md). This is a low-bandwidth supervision link; continuous joystick/VECTOR control and video use separate links.*
-
-## Drone and ground-node location reports
-
-Select serial UART or a specific mesh MAVLink source in **XTOC Sentinel locations**. Set a label such as `WRAITH-01`, the source system/component IDs and reporting interval. Fresh 3D GPS fixes become standard Sentinel position packets, with a stable node ID, over the selected private mesh channel. XTOC can auto-import them through its existing mesh packet path.
-
-![MAVLink to Sentinel location configuration](assets/presence/sentinel-location.png)
-
-*Source-rendered firmware controls with simulated settings. [Setup, wiring and verification guide](wiki/Presence-and-MAVLink.md).*
 
 ## Code included
 
@@ -195,8 +146,6 @@ Do not charge loose lithium cells with improvised wiring. Use protected cells, a
 
 ## Documentation
 
-- [Flight-controller setup: USB ground station, pairing and mission supervision](wiki/Flight-Controller-Link.md)
-- [Online illustrated setup guide](https://www.mkme.org/xtoc/guides/sentinel-flight-link.html) · [Printable PDF](https://www.mkme.org/xtoc/guides/sentinel-flight-link.pdf)
 
 - [Wiki home](wiki/Home.md)
 - [Passive Wi-Fi detection](wiki/Wi-Fi-Detection.md)
@@ -211,7 +160,6 @@ Do not charge loose lithium cells with improvised wiring. Use protected cells, a
 - [Deployment and troubleshooting](https://github.com/MKme/sentinel/blob/main/wiki/Deployment-and-Troubleshooting.md)
 - [Packet and firmware notes](https://github.com/MKme/sentinel/blob/main/wiki/Packet-and-Firmware.md)
 
-The source-controlled [wiki pages](wiki/Home.md) include the [Presence and MAVLink guide](wiki/Presence-and-MAVLink.md). Maintainers can synchronize them into an existing GitHub wiki checkout with `python tools/sync_wiki.py --target <wiki-checkout>` and verify parity with `--check`. Inspect both working trees first. The command adapts page/source/image links and copies referenced images; it does not delete files, commit or publish.
 
 ## Safe deployment checklist
 

@@ -11,7 +11,7 @@ $env:ALL_PROXY = 'http://127.0.0.1:9'
 $env:PLATFORMIO_SETTING_ENABLE_TELEMETRY = 'No'
 $env:PLATFORMIO_SETTING_CHECK_PLATFORMIO_INTERVAL = '99999'
 $env:PLATFORMIO_SETTING_CHECK_PRUNE_SYSTEM_THRESHOLD = '0'
-$BuildRoot = Join-Path $PSScriptRoot '.build/meshtastic'
+$BuildRoot = Join-Path $PSScriptRoot '.build-ground/meshtastic'
 if (-not (Test-Path -LiteralPath $BuildRoot)) {
     python "$PSScriptRoot/prepare.py"
     if ($LASTEXITCODE -ne 0) { throw 'Local preparation failed' }
@@ -19,11 +19,13 @@ if (-not (Test-Path -LiteralPath $BuildRoot)) {
 Copy-Item -Path "$PSScriptRoot/overlay/*" -Destination $BuildRoot -Recurse -Force
 python "$PSScriptRoot/patch_local_input.py"
 if ($LASTEXITCODE -ne 0) { throw 'Local observation ingress hook failed' }
-pio run -d $BuildRoot -e sentinel-xiao-s3
+pio run -d $BuildRoot -e sentinel-ground-xiao-s3
 if ($LASTEXITCODE -ne 0) { throw 'Firmware build failed; no artifacts exported' }
-$Artifacts = Join-Path $PSScriptRoot 'artifacts'
+$Artifacts = Join-Path $PSScriptRoot 'artifacts-ground'
 New-Item -ItemType Directory -Force -Path $Artifacts | Out-Null
-Get-ChildItem -LiteralPath "$BuildRoot/.pio/build/sentinel-xiao-s3" -File |
+@{ product = 'Sentinel Ground'; target = 'sentinel-ground-xiao-s3'; bootIdentity = 'sentinel-ground-v1' } |
+    ConvertTo-Json | Set-Content (Join-Path $Artifacts 'edition.json')
+Get-ChildItem -LiteralPath "$BuildRoot/.pio/build/sentinel-ground-xiao-s3" -File |
     Where-Object { $_.Extension -in '.bin', '.elf', '.json' } |
     Copy-Item -Destination $Artifacts
 Get-ChildItem -LiteralPath $Artifacts -File | Where-Object Name -ne 'sha256.json' | Get-FileHash -Algorithm SHA256 |

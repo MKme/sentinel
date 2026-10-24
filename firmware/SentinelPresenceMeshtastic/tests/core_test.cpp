@@ -10,21 +10,6 @@ int main() {
     s.motionCooldownSeconds=10;s.combinedWindowSeconds=10;
     s.heartbeatSeconds=60;s.portalSeconds=120;
     assert(validSettings(s));
-    SentinelSettingsV4 old{};memset(&old,0xff,sizeof(old));static_cast<SentinelSettingsV3&>(old)=s;
-    SentinelSettings migrated{};static_cast<SentinelSettingsV4&>(migrated)=old;
-    assert(migrated.sentinelSource==0 && migrated.sentinelSystem==1 && migrated.sentinelComponent==1 && migrated.sentinelIntervalSeconds==15);
-    SentinelSettingsV5 prior{};static_cast<SentinelSettingsV4&>(prior)=s;prior.sentinelSource=1;
-    SentinelSettings upgrade{};static_cast<SentinelSettingsV5&>(upgrade)=prior;
-    assert(!upgrade.flightEnabled && !upgrade.flightPeer && upgrade.flightSystem==1 && upgrade.sentinelSource==1);
-    auto flight=s;flight.flightEnabled=true;assert(!validSettings(flight));flight.flightPeer=42;assert(validSettings(flight));
-    flight.mavMeshToSerial=true;assert(!validSettings(flight));flight.mavMeshToSerial=false;
-    flight.flightIntervalMs=249;assert(!validSettings(flight));
-    auto position=s;position.sentinelSource=2;assert(!validSettings(position));
-    position.sentinelPeer=42;assert(validSettings(position));
-    position.sentinelSystem=0;assert(!validSettings(position));position.sentinelSystem=1;
-    position.sentinelIntervalSeconds=4;assert(!validSettings(position));
-    position.sentinelIntervalSeconds=3601;assert(!validSettings(position));
-    position.sentinelIntervalSeconds=15;position.sentinelSource=3;assert(!validSettings(position));
     for(unsigned pin=0;pin<49;++pin) {
         auto v=s;v.motionGpio=pin;
         assert(validSettings(v)==(pin==3||pin==4));
@@ -35,11 +20,6 @@ int main() {
     v=s;v.channelLast=13;assert(!validSettings(v));
     v=s;v.portalSeconds=0;assert(!validSettings(v));
     v=s;v.meshChannelIndex=8;assert(!validSettings(v));
-    v=s;v.mavChannel=8;assert(!validSettings(v));
-    v=s;v.mavBaud=12345;assert(!validSettings(v));
-    v=s;v.mavIntervalMs=999;assert(!validSettings(v));
-    v=s;v.mavIntervalMs=60001;assert(!validSettings(v));
-    v=s;v.mavIntervalMs=1000;v.mavSerialToMesh=true;v.mavMeshToSerial=true;assert(validSettings(v));
     v=s;v.uniqueTtlSeconds=0;assert(!validSettings(v));
     v=s;v.rssiMin=0;assert(!validSettings(v));
     SourceCache cache;

@@ -1,0 +1,7 @@
+{
+  "name": "sentinel-ground",
+  "private": true,
+  "scripts": {
+    "test": "python -X utf8 firmware/SentinelPresenceMeshtastic/tests/run_tests.py"
+  }
+}

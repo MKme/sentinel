@@ -1,6 +1,6 @@
 # Build the first node
 
-Start with a **Presence Wi-Fi detection node**, then add telemetry or a companion. The [standalone Arduino demos](Standalone-Examples.md) are a separate path.
+Start with a **Presence Wi-Fi detection node**, then add a companion. The [standalone Arduino demos](Standalone-Examples.md) are a separate path.
 
 ## Assemble and load firmware
 
@@ -17,8 +17,6 @@ Restart, join **SENTINEL-xxxx**, enter **sentinel123**, and open **http://192.16
 ![Boot configuration screen](../assets/presence/setup-desktop.png)
 
 *Actual firmware renderer with simulated settings. Choose label, motion GPIO and Wi-Fi filters.*
-
-Set a label such as `SITE-01`. Start with channels 1–11, -82 dBm threshold and 250 ms dwell. Enable **Send detections over Meshtastic** and choose your private channel. Leave telemetry forwarding, aircraft link, position conversion and companion input off until the base path works.
 
 ![Mesh output settings](../assets/presence/mesh-output.png)
 

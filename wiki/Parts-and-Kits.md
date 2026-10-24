@@ -16,14 +16,7 @@ Wi-Fi detection needs no external sensor. Keep a disconnected motion input stabl
 
 ## Add the needed interface
 
-| Role | Add |
-| --- | --- |
-| Telemetry/location | 3.3 V TTL MAVLink source and common ground |
-| Paired flight link | MAVLink controller with signing, USB ground radio and XTOC Drones Bridge |
-| Companion observations | Your Pi/computer, USB host connection and classifier |
-| Pi Zero | Host adapter on the data/OTG port, not its power-only socket |
-
-Pi and flight controller use separate interfaces. Never join their TX outputs. Plan power to avoid backfeeding supplies.
+Connect the companion through USB data. Plan power to avoid backfeeding supplies.
 
 ## Standalone learning kit
 

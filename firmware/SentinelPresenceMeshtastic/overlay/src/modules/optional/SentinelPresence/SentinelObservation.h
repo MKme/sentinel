@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include "SentinelPosition.h"
+#include <cstdint>
+#include <cstring>
+#include <cstdio>
 
 namespace sentinelObservation {
+inline bool epochValid(uint32_t seconds) {return seconds>=1577836800U && seconds<4102444800U;}
 // SOI1: magic, LE id:u32, confidence:u16 (0..10000), count:u16,
 // ageMs:u16 (0..5000), labelLength:u8, upper-case ASCII label (1..24).
 struct Input { uint32_t id=0; uint16_t confidence=0,count=0,ageMs=0; char label[25]={}; };
@@ -18,17 +21,10 @@ inline bool decode(const uint8_t *b,size_t n,Input &v) {
     }
     v.label[b[14]]=0;return true;
 }
-struct Report { Input input; uint32_t at=0,utc=0; int32_t lat=INT32_MIN,lon=INT32_MIN; uint32_t fixAge=0; uint8_t location=0; };
-inline Report capture(const Input &input,const sentinelPosition::Position &p,uint32_t now,uint32_t utc) {
+struct Report { Input input; uint32_t at=0,utc=0; };
+inline Report capture(const Input &input,uint32_t now,uint32_t utc) {
     Report r;r.input=input;r.at=now;
-    r.utc=sentinelPosition::epochValid(utc)?utc-input.ageMs/1000:0;
-    // Position describes the sensor at reception, not a projected object location.
-    if(p.hasPosition && p.fix) {
-        r.lat=p.lat;r.lon=p.lon;
-        const uint32_t positionAge=uint32_t(now-p.at),fixAge=uint32_t(now-p.fixAt);
-        r.fixAge=(positionAge>fixAge?positionAge:fixAge)/1000;
-        r.location=uint32_t(now-p.at)<15000 && uint32_t(now-p.fixAt)<15000?1:2;
-    }
+    r.utc=epochValid(utc)?utc-input.ageMs/1000:0;
     return r;
 }
 struct Queue {
@@ -49,15 +45,14 @@ struct Queue {
 inline size_t encode(const Report &r,uint32_t now,uint32_t node,uint32_t packetId,char *out,size_t capacity) {
     uint8_t b[96]={};b[0]=1;b[1]=6;
     auto be=[&](unsigned i,uint32_t v){for(unsigned j=0;j<4;++j)b[i+j]=uint8_t(v>>(24-8*j));};
-    be(2,r.utc/60);be(6,r.location?uint32_t(sentinelPosition::e5(r.lat)):uint32_t(INT32_MIN));
-    be(10,r.location?uint32_t(sentinelPosition::e5(r.lon)):uint32_t(INT32_MIN));be(14,node);
+    be(2,r.utc/60);be(6,uint32_t(INT32_MIN));
+    be(10,uint32_t(INT32_MIN));be(14,node);
     const uint32_t elapsed=uint32_t(now-r.at)/1000;
-    const bool stale=r.location==2 || (r.location==1 && r.fixAge+elapsed>=15);
-    b[18]=1|4|64|(r.location?0:8)|(stale?16:0)|(r.utc?0:32);
+    b[18]=1|4|64|8|(r.utc?0:32);
     char label[32];snprintf(label,sizeof(label),"OBS %s",r.input.label);unsigned len=strlen(label),n=20+len;b[19]=len;memcpy(b+20,label,len);
     auto sensor=[&](uint8_t type,uint16_t value){b[n++]=type;b[n++]=value>>8;b[n++]=value;};
     auto cap=[](uint32_t v){return uint16_t(v>32767?32767:v);};
-    sensor(240,r.input.confidence);sensor(241,r.input.count);sensor(242,r.location?cap(r.fixAge+elapsed):uint16_t(-1));
+    sensor(240,r.input.confidence);sensor(241,r.input.count);sensor(242,uint16_t(-1));
     sensor(243,cap(r.input.ageMs/1000+elapsed));sensor(244,r.input.id>>16);sensor(245,r.input.id);
     constexpr char alphabet[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     char encoded[132]={};unsigned z=0;
