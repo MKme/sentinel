@@ -1,3 +1,4 @@
+param([switch]$Power,[string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 $savedEnvironment = @{}
 foreach ($name in @('PIP_NO_INDEX','HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','PLATFORMIO_SETTING_ENABLE_TELEMETRY','PLATFORMIO_SETTING_CHECK_PLATFORMIO_INTERVAL','PLATFORMIO_SETTING_CHECK_PRUNE_SYSTEM_THRESHOLD')) {
@@ -19,13 +20,25 @@ if (-not (Test-Path -LiteralPath $BuildRoot)) {
 Copy-Item -Path "$PSScriptRoot/overlay/*" -Destination $BuildRoot -Recurse -Force
 python "$PSScriptRoot/patch_local_input.py"
 if ($LASTEXITCODE -ne 0) { throw 'Local observation ingress hook failed' }
-pio run -d $BuildRoot -e sentinel-ground-xiao-s3
+$target = if ($Power) { 'sentinel-ground-power-xiao-s3' } else { 'sentinel-ground-xiao-s3' }
+$configPath = Join-Path $BuildRoot 'platformio.ini'
+if (-not (Select-String -LiteralPath $configPath -SimpleMatch '[env:sentinel-ground-power-xiao-s3]' -Quiet)) {
+@'
+
+[env:sentinel-ground-power-xiao-s3]
+extends = env:sentinel-ground-xiao-s3
+build_flags =
+  ${env:sentinel-ground-xiao-s3.build_flags}
+  -DSENTINEL_POWER_ENABLED=1
+'@ | Add-Content -LiteralPath $configPath
+}
+pio run -d $BuildRoot -e $target
 if ($LASTEXITCODE -ne 0) { throw 'Firmware build failed; no artifacts exported' }
-$Artifacts = Join-Path $PSScriptRoot 'artifacts-ground'
+$Artifacts = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $PSScriptRoot $(if ($Power) { 'artifacts-ground-power' } else { 'artifacts-ground' }) }
 New-Item -ItemType Directory -Force -Path $Artifacts | Out-Null
-@{ product = 'Sentinel Ground'; target = 'sentinel-ground-xiao-s3'; bootIdentity = 'sentinel-ground-v1' } |
+@{ product = 'Sentinel Ground'; target = $target; bootIdentity = 'sentinel-ground-v1' } |
     ConvertTo-Json | Set-Content (Join-Path $Artifacts 'edition.json')
-Get-ChildItem -LiteralPath "$BuildRoot/.pio/build/sentinel-ground-xiao-s3" -File |
+Get-ChildItem -LiteralPath "$BuildRoot/.pio/build/$target" -File |
     Where-Object { $_.Extension -in '.bin', '.elf', '.json' } |
     Copy-Item -Destination $Artifacts
 Get-ChildItem -LiteralPath $Artifacts -File | Where-Object Name -ne 'sha256.json' | Get-FileHash -Algorithm SHA256 |

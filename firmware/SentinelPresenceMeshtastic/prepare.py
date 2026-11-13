@@ -88,4 +88,12 @@ build_src_filter =
   -<mesh/http/>
   -<modules/esp32/PaxcounterModule.cpp>
 '''.replace('PLATFORM',a.platform.resolve().as_posix()).replace('LIBS',libs.as_posix()))
+with (dest/'platformio.ini').open('a') as f:
+    f.write('''
+[env:sentinel-ground-power-xiao-s3]
+extends = env:sentinel-ground-xiao-s3
+build_flags =
+  ${env:sentinel-ground-xiao-s3.build_flags}
+  -DSENTINEL_POWER_ENABLED=1
+''')
 print(dest)

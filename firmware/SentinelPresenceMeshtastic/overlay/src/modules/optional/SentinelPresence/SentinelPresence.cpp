@@ -7,6 +7,8 @@
 #include "SentinelPresenceConfig.h"
 #include "SentinelCore.h"
 #include "SentinelObservation.h"
+#include "SentinelPowerConfig.h"
+#include "XtocPowerPacket.h"
 #include "RTC.h"
 #include "Channels.h"
 #include "MeshService.h"
@@ -240,7 +242,7 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
         processWifiEvents(now);
         hopWifiChannel(now);
         printHeartbeat(now);
-        return 25;
+        return pollPower(now) ? 1 : 25;
     }
 
   private:
@@ -571,6 +573,58 @@ class SentinelPresenceModule : public SinglePortModule, private concurrency::OST
                 sendMeshAlert(combined ? "MOTION+WIFI DETECTED" : "WIFI DETECTED", event.rssi, event.channel);
             }
         }
+    }
+
+    // Optional cooperative power sensing leaves the scanner and motion loop running.
+    uint32_t powerStarted=0,powerLast=0;
+    bool powerSampling=false,powerPinsReady=false;
+    xtocPower::Window powerCurrent,powerVoltage;
+    bool pollPower(uint32_t now) {
+#if SENTINEL_POWER_ENABLED
+        if (SENTINEL_POWER_AMPS_PER_ADC_VOLT<=0 ||
+            (SENTINEL_POWER_MEASURE_VOLTAGE && SENTINEL_POWER_VOLTS_PER_ADC_VOLT<=0)) return false;
+        if (!powerPinsReady) {
+            analogReadResolution(12);
+            analogSetPinAttenuation(SENTINEL_POWER_CURRENT_GPIO,ADC_11db);
+            analogSetPinAttenuation(SENTINEL_POWER_VOLTAGE_GPIO,ADC_11db);
+            powerPinsReady=true;
+        }
+        if (!powerSampling) {
+            if (powerLast && uint32_t(now-powerLast)<SENTINEL_POWER_INTERVAL_MS) return false;
+            powerLast=now;powerStarted=now;powerSampling=true;
+            powerCurrent=xtocPower::Window{};powerVoltage=xtocPower::Window{};
+        }
+        int raw=analogRead(SENTINEL_POWER_CURRENT_GPIO);
+        powerCurrent.add(analogReadMilliVolts(SENTINEL_POWER_CURRENT_GPIO)/1000.,raw<=8||raw>=4087);
+        if (SENTINEL_POWER_MEASURE_VOLTAGE) {
+            raw=analogRead(SENTINEL_POWER_VOLTAGE_GPIO);
+            powerVoltage.add(analogReadMilliVolts(SENTINEL_POWER_VOLTAGE_GPIO)/1000.,raw<=8||raw>=4087);
+        }
+        if (uint32_t(now-powerStarted)<200)return true;
+        powerSampling=false;
+        xtocPower::Values value;value.channel=SENTINEL_POWER_CHANNEL;value.dc=SENTINEL_POWER_DC;
+        value.currentA=(value.dc?powerCurrent.mean()-SENTINEL_POWER_CURRENT_ZERO_V:powerCurrent.acRms())*SENTINEL_POWER_AMPS_PER_ADC_VOLT;
+        if (!isfinite(value.currentA))return false;
+        if (SENTINEL_POWER_MEASURE_VOLTAGE)value.voltageV=(value.dc?powerVoltage.mean():powerVoltage.acRms())*SENTINEL_POWER_VOLTS_PER_ADC_VOLT;
+        if (value.dc && isfinite(value.voltageV))value.activeW=value.voltageV*value.currentA;
+        if (!value.dc && SENTINEL_POWER_MEASURE_VOLTAGE && isfinite(value.voltageV))value.apparentVA=value.currentA*value.voltageV;
+        if (!value.dc && !SENTINEL_POWER_MEASURE_VOLTAGE && SENTINEL_POWER_NOMINAL_AC_VOLTS>0) {
+            value.assumedVoltage=true;value.voltageV=SENTINEL_POWER_NOMINAL_AC_VOLTS;
+            value.apparentVA=value.currentA*value.voltageV;
+        }
+        if (!settings.meshOutput || !privateChannelAllowed(settings.meshChannelIndex,true))return false;
+        auto *packet=allocDataPacket();if(!packet)return false;
+        char identity[40],text[237];
+        snprintf(identity,sizeof(identity),"P%08lX_%08lX",(unsigned long)nodeDB->getNodeNum(),(unsigned long)packet->id);
+        size_t length=xtocPower::encode(value,nodeDB->getNodeNum(),getValidTime(RTCQualityDevice),settings.label,identity,text,sizeof(text));
+        if (!length){packetPool.release(packet);return false;}
+        packet->decoded.portnum=meshtastic_PortNum_TEXT_MESSAGE_APP;packet->channel=settings.meshChannelIndex;
+        packet->want_ack=false;packet->decoded.payload.size=length;memcpy(packet->decoded.payload.bytes,text,length);
+        service->sendToMesh(packet,RX_SRC_LOCAL,true);
+#else
+        (void)now;
+#endif
+        return false;
     }
 
     void pollMotion(uint32_t now)

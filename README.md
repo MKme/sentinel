@@ -185,3 +185,7 @@ Sentinel reports are decoded by XTOC and XCOM. XTOC provides the Sentinel review
 ## Radio and security note
 
 The example sketches emit clear packets so they are easy to inspect and test. Use an appropriate authenticated/secure transport for real control where lawful. Encryption or obscured content may be prohibited on amateur radio; the operator is responsible for applicable rules.
+
+## Optional power sensors
+
+Sentinel Ground can add calibrated AC current or DC current/voltage sensing on its private Meshtastic channel. The optional build uses the standard XTOC/XCOM SENTINEL Power packet profile, alongside the existing detection workflow. See [Power wiring, calibration and build instructions](firmware/SentinelPresenceMeshtastic/README.md#optional-currentvoltage-sensing).

@@ -11,5 +11,5 @@ for name in ('core_test', 'observation_test'):
     result = subprocess.run([str(exe)], check=True, capture_output=True, text=True)
     (out/(name+'.txt')).write_text(result.stdout)
     print(result.stdout, end='')
-for name in ('ground_integration.py', 'settings_test.py', 'check_public.py', 'render_portal.py'):
+for name in ('ground_integration.py', 'power_integration.py', 'settings_test.py', 'check_public.py', 'render_portal.py'):
     subprocess.run(['python', '-X', 'utf8', str(root/'tests'/name)], check=True)
